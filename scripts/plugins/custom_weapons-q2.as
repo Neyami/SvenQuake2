@@ -22,7 +22,7 @@ const int PLAYER_MAX_ARMOR = 100;
 void PluginInit()
 {
 	g_Module.ScriptInfo.SetAuthor("Nero");
-	g_Module.ScriptInfo.SetContactInfo("Nero @ Svencoop forums");
+	g_Module.ScriptInfo.SetContactInfo("https://discord.gg/0wtJ6aAd7XOGI6vI");
 }
 
 void MapInit()
