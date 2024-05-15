@@ -233,26 +233,38 @@ class weapon_q2railgun : ScriptBasePlayerWeaponEntity, item_q2weapon
 		DestroyRailEffect();
 
 		@m_pRailBeam = @g_EntityFuncs.CreateBeam( "sprites/laserbeam.spr", 30 );
-		m_pRailBeam.pev.spawnflags |= SF_BEAM_TEMPORARY;
-		//@m_pRailBeam.pev.owner = @m_pPlayer.edict();
+		m_pRailBeam.SetType( BEAM_POINTS );
+		m_pRailBeam.SetScrollRate( 50 );
+		m_pRailBeam.SetBrightness( 255 );
+		m_pRailBeam.SetColor( 255, 255, 255 );
+		m_pRailBeam.PointsInit( railStart, railtr.vecEndPos );
+
+		/*m_pRailBeam.pev.spawnflags |= SF_BEAM_TEMPORARY;
 		m_pRailBeam.SetEndAttachment( 1 );
 		m_pRailBeam.SetScrollRate( 50 );
 		m_pRailBeam.SetBrightness( 255 );
 		m_pRailBeam.SetColor( 255, 255, 255 );
 		m_pRailBeam.SetStartPos( railtr.vecEndPos );
-		m_pRailBeam.SetEndPos( railStart );
+		m_pRailBeam.SetEndPos( railStart );*/
 
 		@m_pRailBeam2 = @g_EntityFuncs.CreateBeam( "sprites/laserbeam.spr", 5 );
+		m_pRailBeam2.SetType( BEAM_POINTS );
 		m_pRailBeam2.SetFlags( BEAM_FSINE );
+		m_pRailBeam2.SetScrollRate( 50 );
+		m_pRailBeam2.SetNoise( 20 );
+		m_pRailBeam2.SetBrightness( 255 );
+		m_pRailBeam2.SetColor( 100, 100, 255 );
+		m_pRailBeam2.PointsInit( railStart, railtr.vecEndPos );
+
+		/*m_pRailBeam2.SetFlags( BEAM_FSINE );
 		m_pRailBeam2.pev.spawnflags |= SF_BEAM_TEMPORARY;
-		//@m_pRailBeam2.pev.owner = @m_pPlayer.edict();
 		m_pRailBeam2.SetEndAttachment( 1 );
 		m_pRailBeam2.SetScrollRate( 50 );
 		m_pRailBeam2.SetNoise( 20 );
 		m_pRailBeam2.SetBrightness( 255 );
 		m_pRailBeam2.SetColor( 100, 100, 255 );
 		m_pRailBeam2.SetStartPos( railtr.vecEndPos );
-		m_pRailBeam2.SetEndPos( railStart );
+		m_pRailBeam2.SetEndPos( railStart );*/
 
 		railbr = 255;
 	}
