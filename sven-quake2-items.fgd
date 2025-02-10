@@ -1,0 +1,140 @@
+@BaseClass base(CustomRespawnDelay) = Quake2Pickup
+[
+	spawnflags(Flags) =
+	[
+		1024 : "No Respawn" : 0
+	]
+]
+
+
+//WEAPONS
+
+@PointClass base(Weapon, Targetx, ExclusiveHold) studio("models/quake2/weapons/w_blaster.mdl") = weapon_q2blaster : "Blaster" []
+
+@PointClass base(Weapon, Targetx, ExclusiveHold) studio("models/quake2/weapons/w_shotgun.mdl") = weapon_q2shotgun : "Shotgun" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/weapons/w_shotgun.mdl") = item_q2shotgun : "Shotgun Pickup"
+[
+	body(Choices) : "Floating" : 1 =
+	[
+		0  : "No"
+		1  : "Yes"
+	]
+]
+
+@PointClass base(Weapon, Targetx, ExclusiveHold) studio("models/quake2/weapons/w_supershotgun.mdl") = weapon_q2supershotgun : "Super Shotgun" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/weapons/w_supershotgun.mdl") = item_q2supershotgun : "Super Shotgun Pickup"
+[
+	body(Choices) : "Floating" : 1 =
+	[
+		0  : "No"
+		1  : "Yes"
+	]
+]
+
+@PointClass base(Weapon, Targetx, ExclusiveHold) studio("models/quake2/weapons/w_machinegun.mdl") = weapon_q2machinegun : "Machine Gun" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/weapons/w_machinegun.mdl") = item_q2machinegun : "Machine Gun Pickup"
+[
+	body(Choices) : "Floating" : 1 =
+	[
+		0  : "No"
+		1  : "Yes"
+	]
+]
+
+@PointClass base(Weapon, Targetx, ExclusiveHold) studio("models/quake2/weapons/w_chaingun.mdl") = weapon_q2chaingun : "Chaingun" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/weapons/w_chaingun.mdl") = item_q2chaingun : "Chaingun Pickup"
+[
+	body(Choices) : "Floating" : 1 =
+	[
+		0  : "No"
+		1  : "Yes"
+	]
+]
+
+@PointClass base(Weapon, Targetx, ExclusiveHold) studio("models/quake2/weapons/w_glauncher.mdl") = weapon_q2grenadelauncher : "Grenade Launcher" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/weapons/w_glauncher.mdl") = item_q2grenadelauncher : "Grenade Launcher Pickup"
+[
+	body(Choices) : "Floating" : 1 =
+	[
+		0  : "No"
+		1  : "Yes"
+	]
+]
+
+@PointClass base(Weapon, Targetx, ExclusiveHold) studio("models/quake2/weapons/w_rlauncher.mdl") = weapon_q2rocketlauncher : "Rocket Launcher" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/weapons/w_rlauncher.mdl") = item_q2rocketlauncher : "Rocket Launcher Pickup"
+[
+	body(Choices) : "Floating" : 1 =
+	[
+		0  : "No"
+		1  : "Yes"
+	]
+]
+
+@PointClass base(Weapon, Targetx, ExclusiveHold) studio("models/quake2/weapons/w_hyperblaster.mdl") = weapon_q2hyperblaster : "Hyper Blaster" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/weapons/w_hyperblaster.mdl") = item_q2hyperblaster : "Hyper Blaster Pickup"
+[
+	body(Choices) : "Floating" : 1 =
+	[
+		0  : "No"
+		1  : "Yes"
+	]
+]
+
+@PointClass base(Weapon, Targetx, ExclusiveHold) studio("models/quake2/weapons/w_railgun.mdl") = weapon_q2railgun : "Railgun" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/weapons/w_railgun.mdl") = item_q2railgun : "Railgun Pickup"
+[
+	body(Choices) : "Floating" : 1 =
+	[
+		0  : "No"
+		1  : "Yes"
+	]
+]
+
+@PointClass base(Weapon, Targetx, ExclusiveHold) studio("models/quake2/weapons/w_bfg.mdl") = weapon_q2bfg : "BFG 10K" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/weapons/w_bfg.mdl") = item_q2bfg : "BFG 10K Pickup"
+[
+	body(Choices) : "Floating" : 1 =
+	[
+		0  : "No"
+		1  : "Yes"
+	]
+]
+
+
+//HEALTH
+@PointClass size(-16 -16 -24, 16 16 32) base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/healing/stimpack.mdl") = item_health_small : "+2 health" []
+@PointClass size(-16 -16 -24, 16 16 32) base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/healing/medium.mdl") = item_health : "+10 health" []
+@PointClass size(-16 -16 -24, 16 16 32) base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/healing/large.mdl") = item_health_large : "+25 health" []
+@PointClass size(-16 -16 -24, 16 16 32) base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/mega_h.mdl") = item_health_mega : "+100 health" []
+
+
+//ARMOR
+@PointClass size(-16 -16 -24, 16 16 32) base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/armor/shard.mdl") = item_armor_shard : "Armor Shard" []
+@PointClass size(-16 -16 -24, 16 16 32) base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/armor/jacket.mdl") = item_armor_jacket : "Jacket Armor" []
+@PointClass size(-16 -16 -24, 16 16 32) base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/armor/combat.mdl") = item_armor_combat : "Combat Armor" []
+@PointClass size(-16 -16 -24, 16 16 32) base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/armor/body.mdl") = item_armor_body : "Body Armor" []
+
+
+//AMMO
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/ammo/shells.mdl") = ammo_q2shells : "Quake 2 Shells" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/ammo/bullets.mdl") = ammo_q2bullets : "Quake 2 Bullets" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/ammo/grenades.mdl") = ammo_q2grenades : "Quake 2 Grenades" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/ammo/rockets.mdl") = ammo_q2rockets : "Quake 2 Rockets" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/ammo/cells.mdl") = ammo_q2cells : "Quake 2 Cells" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/ammo/slugs.mdl") = ammo_q2slugs : "Quake 2 Slugs" []
+
+
+
+//OTHER ITEMS
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/quaddama.mdl") = item_quad : "Quad Damage" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/invulner.mdl") = item_invulnerability : "Invulnerability" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/silencer.mdl") = item_silencer : "Silencer" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/adrenaline.mdl") = item_adrenaline : "+1 to max health" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/c_head.mdl") = item_ancient_head : "+2 to max health, +5 in rerelease" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/breather.mdl") = item_breather : "Rebreather" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/enviro.mdl") = item_enviro : "Environment Suit" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/bandolier.mdl") = item_bandolier : "Equipment Belt" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/pack.mdl") = item_pack : "Heavy backpack" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/screen.mdl") = item_power_screen : "Power Screen" []
+@PointClass base(Item, Quake2Pickup, Targetx) studio("models/quake2/items/shield.mdl") = item_power_shield : "Power Shield" []

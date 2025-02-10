@@ -1,0 +1,68 @@
+@include "../svencoop/sven-coop.fgd"  
+@include "sven-quake2-items.fgd" 
+
+@BaseClass = Quake2
+[
+    health_multiplier(string) : "Set health based on multiplier of base health" : "1.0"
+
+	power_armor_power(integer) : "Override power armor amount" : "100"
+	power_armor_type(Choices) : "Override power armor type" : 0 =
+    [
+        0 : "None"
+        1 : "Screen"
+        2 : "Shield"
+    ]
+]
+
+@PointClass base(Monster, Quake2) size(-16 -16 0, 16 16 80) studio("models/quake2/monsters/soldier/soldier.mdl") = npc_q2soldier : "Quake 2 Guard"
+[
+	weapons(Choices) : "Weapons" : 1 =
+	[
+		1  : "Blaster"
+		2  : "Shotgun"
+		4  : "Machine Gun"
+		8  : "Random"
+	]
+]
+
+@PointClass base(Monster, Quake2) size(-16 -16 0, 16 16 80) studio("models/quake2/monsters/enforcer/enforcer.mdl") = npc_q2enforcer : "Quake 2 Enforcer" []
+
+@PointClass base(Monster, Quake2) size(-16 -16 0, 16 16 80) studio("models/quake2/monsters/ironmaiden/ironmaiden.mdl") = npc_q2ironmaiden : "Quake 2 Iron Maiden" []
+
+@PointClass base(Monster, Quake2) size(-16 -16 0, 16 16 42) studio("models/quake2/monsters/parasite/parasite.mdl") = npc_q2parasite : "Quake 2 Parasite" []
+
+@PointClass base(Monster, Quake2) size(-16 -16 0, 16 16 88) studio("models/quake2/monsters/gunner/gunner.mdl") = npc_q2gunner : "Quake 2 Gunner" []
+
+@PointClass base(Monster, Quake2) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/berserker/berserker.mdl") = npc_q2berserker : "Quake 2 Berserker" []
+
+@PointClass base(Monster, Quake2) size(-32 -32 0, 32 32 90) studio("models/quake2/monsters/gladiator/gladiator.mdl") = npc_q2gladiator : "Quake 2 Gladiator" []
+
+@PointClass base(Monster, Quake2) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/tank/tank.mdl") = npc_q2tank : "Quake 2 Tank" []
+
+@PointClass base(Monster, Quake2) size(-32 -32 0, 32 32 128) studio("models/quake2/monsters/tank/tank.mdl") skin(2) = npc_q2tankc : "Quake 2 Tank Commander" 
+[
+	speed(float) : "Homing Missile Speed" : "0.0"
+    weapons(Choices) : "Custom Spawnflags" : 0 =
+    [
+        8 : "N64 Guardian"
+		16 : "Heat-Seeking Missiles"
+    ]
+]
+
+@PointClass base(Monster, Quake2) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/supertank/supertank.mdl") = npc_q2supertank : "Quake 2 Super Tank" 
+[
+    weapons(Choices) : "Custom Spawnflags" : 0 =
+    [
+        8 : "Boss (Power shield and heat-seeking rockets"
+    ]
+]
+
+@PointClass base(Monster, Quake2) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/jorg/jorg.mdl") = npc_q2jorg : "Quake 2 Jorg" 
+[
+    weapons(Choices) : "Custom Spawnflags" : 0 =
+    [
+        1024 : "No rider (no bfg, and Makron won't spawn upon death)"
+    ]
+]
+
+@PointClass base(Monster, Quake2) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/makron/makron.mdl") = npc_q2makron : "Quake 2 Makron" []
