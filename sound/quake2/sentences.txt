@@ -1,2 +1,0 @@
-HEV_DEAD0 quake2/null
-HEV_DEAD1 quake2/null
