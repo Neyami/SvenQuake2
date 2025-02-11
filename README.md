@@ -231,4 +231,327 @@ Ammo Entity: `ammo_q2cells`
 
 <BR>
 
-# ITEMS #  
+# HEALTH AND ARMOR ITEMS #  
+
+
+<BR>
+
+
+## STIMPACK ##  
+`item_health_small`  
+
+
+<BR>
+
+
+## FIRST AID ##  
+`item_health`  
+
+
+<BR>
+
+
+## MEDKIT ##  
+`item_health_large`  
+
+
+<BR>
+
+
+## MEGAHEALTH ##  
+`item_health_mega`  
+
+
+<BR>
+
+
+## ADRENALINE ##  
+`item_adrenaline`  
+
+
+<BR>
+
+
+## ANCIENT HEAD ##  
+`item_ancient_head`  
+
+
+<BR>
+
+
+## ARMOR SHARD ##  
+`item_armor_shard`  
+
+
+<BR>
+
+
+## JACKET ARMOR ##  
+`item_armor_jacket`  
+
+
+<BR>
+
+
+## COMBAT ARMOR ##  
+`item_armor_combat`  
+
+
+<BR>
+
+
+## BODY ARMOR ##  
+`item_armor_body`  
+
+
+<BR>
+
+<BR>
+
+
+# HEALTH AND ARMOR ITEMS #  
+
+
+<BR>
+
+
+## STIMPACK ##  
+`item_health_small`  
++2 health (ignores max health)  
+
+
+<BR>
+
+
+## FIRST AID ##  
+`item_health`  
+
+
+<BR>
+
+
+## MEDKIT ##  
+`item_health_large`  
+
+
+<BR>
+
+
+## MEGAHEALTH ##  
+`item_health_mega`  
+
+
+<BR>
+
+
+## ADRENALINE ##  
+`item_adrenaline`  
+
+
+<BR>
+
+
+## ANCIENT HEAD ##  
+`item_ancient_head`  
+
+
+<BR>
+
+
+## ARMOR SHARD ##  
+`item_armor_shard`  
+
+
+<BR>
+
+
+## JACKET ARMOR ##  
+`item_armor_jacket`  
+
+
+<BR>
+
+
+## COMBAT ARMOR ##  
+`item_armor_combat`  
+
+
+<BR>
+
+
+## BODY ARMOR ##  
+`item_armor_body`  
+
+
+<BR>
+
+<BR>
+
+
+# HEALTH AND ARMOR ITEMS #  
+
+
+<BR>
+
+
+## STIMPACK ##  
+`item_health_small`  
++2 health (ignores max health)  
+
+
+<BR>
+
+
+## FIRST AID ##  
+`item_health`  
++10 health  
+
+
+<BR>
+
+
+## MEDKIT ##  
+`item_health_large`  
++25 health  
+
+
+<BR>
+
+
+## MEGAHEALTH ##  
+`item_health_mega`  
++100 health (ignores max health)  
+
+
+<BR>
+
+
+## ADRENALINE ##  
+`item_adrenaline`  
+Full heal and +1 to max health  
+
+
+<BR>
+
+
+## ANCIENT HEAD ##  
+`item_ancient_head`  
++5 to max health  
+
+
+<BR>
+
+
+## ARMOR SHARD ##  
+`item_armor_shard`  
++2 armor (ignores max armor)  
+
+
+<BR>
+
+
+## JACKET ARMOR ##  
+`item_armor_jacket`  
++25 armor (up to 50)  
+
+
+<BR>
+
+
+## COMBAT ARMOR ##  
+`item_armor_combat`  
++50 armor (up to 100)  
+
+
+<BR>
+
+
+## BODY ARMOR ##  
+`item_armor_body`  
++100 armor (up to 200)  
+
+
+<BR>
+
+<BR>
+
+
+# OTHER ITEMS #  
+
+
+<BR>
+
+
+## QUAD DAMAGE ##  
+`item_quad`  
+Multiplies the damage of all your Quake 2 weapons by 4 for 30 seconds  
+
+
+<BR>
+
+
+## INVULNERABILITY ##  
+`item_invulnerability`  
+Makes you invulnerable for 30 seconds  
+
+
+<BR>
+
+
+## REBREATHER ##  
+`item_breather`  
+Lets you breathe under water for 30 seconds  
+
+
+<BR>
+
+
+## ENVIRO-SUIT ##  
+`item_enviro`  
+Lets you breathe under water for 30 seconds  
+Makes you immune to slime (acid) damage, and reduces damage from swimming in lava  
+
+
+<BR>
+
+
+## SILENCER ##  
+`item_silencer`  
+All your Quake 2 weapons will be silenced (drawing less attention from enemies)  
+
+
+<BR>
+
+
+## POWER SCREEN ##  
+`item_power_screen`  
+Reduces damage taken while active, drains q2cells when hit, toggleable  
+
+
+<BR>
+
+
+## POWER SHIELD ##  
+`item_power_shield`  
+Reduces damage taken while active, drains q2cells when hit, toggleable  
+
+
+<BR>
+
+
+## BANDOLIER ##  
+`item_bandolier`  
+Increases max ammo for q2bullets, shells, cells, and slugs  
+Gives 60 bullets and shells (without going over the max)  
+
+
+<BR>
+
+
+## AMMO PACK ##  
+`item_pack`  
+Increases max ammo for all Quake 2 ammo  
+Gives 180 to all ammo (without going over the max)  
+
+
+<BR>
