@@ -95,3 +95,15 @@ Refer to `sven-quake2.fgd` to see the keyvalues that set the weapons
 <BR>
 
 
+## JORG ##  
+`npc_q2jorg`  
+
+
+<BR>
+
+
+## MAKRON ##  
+`npc_q2makron`  
+
+
+<BR>
