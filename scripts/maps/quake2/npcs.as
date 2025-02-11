@@ -108,6 +108,15 @@ void InitializeNPCS()
 	g_iChaosMode = CHAOS_NONE;
 	g_iDifficulty = DIFF_NIGHTMARE;
 
+	//for gibs
+	g_SoundSystem.PrecacheSound( "debris/flesh1.wav" );
+	g_SoundSystem.PrecacheSound( "debris/flesh2.wav" );
+	g_SoundSystem.PrecacheSound( "debris/flesh3.wav" );
+	g_SoundSystem.PrecacheSound( "debris/flesh4.wav" );
+	g_SoundSystem.PrecacheSound( "debris/flesh5.wav" );
+	g_SoundSystem.PrecacheSound( "debris/flesh6.wav" );
+	g_SoundSystem.PrecacheSound( "debris/flesh7.wav" );
+
 	npc_q2soldier::Register();
 	npc_q2enforcer::Register();
 	npc_q2parasite::Register();
