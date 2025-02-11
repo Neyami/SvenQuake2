@@ -16,7 +16,8 @@ q2dm1 has leaks somewhere
 9) Players should also start with weapon_q2grenades for now (they start with 0 grenades so can't be used until finding ammo_q2grenades or the grenade launcher)
 10) All effects from "inventory" items can be stacked (increase time on Quad Damage, or Silencer shots)  
 
-Plugin TBM  
+Plugin TBM, but you can probably just `#include "weapons"` and call `q2weapons::Register();`  
+Ammo items are in `items` though  
 
 Models, textures, sounds, sprites, maps by iD Software.  
 
