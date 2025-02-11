@@ -107,3 +107,120 @@ Refer to `sven-quake2.fgd` to see the keyvalues that set the weapons
 
 
 <BR>
+
+<BR>
+
+<BR>
+
+# WEAPONS #  
+
+item_q2weaponname levitates  
+weapon_q2weaponname doesn't  
+
+<BR>
+
+
+## BLASTER ##  
+Weapon Entity: `weapon_q2blaster`  
+
+
+<BR> 
+
+
+## SHOTGUN ##  
+Weapon Entity: `weapon_q2shotgun`  
+Pickup Entity: `item_q2shotgun`  
+Ammo Name: `q2shells`  
+Ammo Entity: `ammo_q2shells`  
+
+
+<BR> 
+
+
+## SUPER SHOTGUN ##  
+Weapon Entity: `weapon_q2supershotgun`  
+Pickup Entity: `item_q2supershotgun`  
+Ammo Name: `q2shells`  
+Ammo Entity: `ammo_q2shells` 
+
+
+<BR> 
+
+
+## MACHINE GUN ##  
+Weapon Entity: `weapon_q2machinegun`  
+Pickup Entity: `item_q2machinegun`  
+Ammo Name: `q2bullets`  
+Ammo Entity: `ammo_q2bullets`  
+
+
+<BR> 
+
+
+## CHAINGUN ##  
+Weapon Entity: `weapon_q2chaingun`  
+Pickup Entity: `item_q2chaingun`  
+Ammo Name: `q2bullets`  
+Ammo Entity: `ammo_q2bullets`  
+
+
+<BR> 
+
+
+## HAND GRENADES ##  
+Weapon Entity: `weapon_q2grenades`  
+Ammo Name: `q2grenades`  
+Ammo Entity: `ammo_q2grenades`  
+
+
+<BR> 
+
+
+## GRENADE LAUNCHER ##  
+Weapon Entity: `weapon_q2grenadelauncher`  
+Pickup Entity: `item_q2grenadelauncher`  
+Ammo Name: `q2grenades`  
+Ammo Entity: `ammo_q2grenades`  
+
+
+<BR> 
+
+
+## ROCKET LAUNCHER ##  
+Weapon Entity: `weapon_q2rocketlauncher`  
+Pickup Entity: `item_q2rocketlauncher`  
+Ammo Name: `q2rockets`  
+Ammo Entity: `ammo_q2rockets`  
+
+
+<BR> 
+
+
+## HYPER BLASTER ##  
+Weapon Entity: `weapon_q2hyperblaster`  
+Pickup Entity: `item_q2hyperblaster`  
+Ammo Name: `q2cells`  
+Ammo Entity: `ammo_q2cells`  
+
+
+<BR> 
+
+
+## RAILGUN ##  
+Weapon Entity: `weapon_q2railgun`  
+Pickup Entity: `item_q2railgun`  
+Ammo Name: `q2slugs`  
+Ammo Entity: `ammo_q2slugs`  
+
+
+<BR> 
+
+
+## BFG 10K ##  
+Weapon Entity: `weapon_q2bfg`  
+Pickup Entity: `item_q2bfg`  
+Ammo Name: `q2cells`  
+Ammo Entity: `ammo_q2cells`  
+
+
+<BR> 
