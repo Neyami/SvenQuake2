@@ -9,6 +9,8 @@ Maps are a work in progress that I may or may not finish.
 5) Check sven-quake2.fgd and sven-quake2-items.fgd
 6) If you want weapon pickups to levitate and spin, use the item_q2weaponname entities, weapon_q2weaponname (should) work like normal
 7) Edit the text files in scripts\maps\quake2\data\ to your liking
+8) If you're using the items (item_quad etc), make sure players spawn with weapon_q2inventory (it's a separator to prevent accidental item activation)
+9) Players should also start with weapon_q2grenades for now (they start with 0 grenades so can't be used until finding ammo_q2grenades or the grenade launcher)  
 
 Plugin TBM  
 
@@ -223,4 +225,10 @@ Ammo Name: `q2cells`
 Ammo Entity: `ammo_q2cells`  
 
 
-<BR> 
+<BR>
+
+<BR>
+
+<BR>
+
+# ITEMS #  
