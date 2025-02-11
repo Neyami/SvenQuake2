@@ -3,6 +3,7 @@ Weapons, items, and NPCs from Quake 2 ported to Sven Co-op.
 Maps are a work in progress that I may or may not finish.  
 q2jorgarena ends after killing the boss, but you'll fall through the floor to the right of Jorg (when looking at him) idk why  
 q2dm1 has leaks somewhere  
+stadium4q2 is a modified version of stadium4 for testing the NPCs  
 
 
 1) Download and put it in svencoop_addons, keeping directories
