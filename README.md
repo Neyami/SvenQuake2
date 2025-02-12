@@ -15,7 +15,8 @@ stadium4q2 is a modified version of stadium4 for testing the NPCs
 7) Edit the text files in scripts\maps\quake2\data\ to your liking
 8) If you're using the items (item_quad etc), make sure players spawn with weapon_q2inventory (it's a separator to prevent accidental item activation)
 9) Players should also start with weapon_q2grenades for now (they start with 0 grenades so can't be used until finding ammo_q2grenades or the grenade launcher)
-10) All effects from "inventory" items can be stacked (increase time on Quad Damage, or Silencer shots)  
+10) All effects from "inventory" items can be stacked (increase time on Quad Damage, or Silencer shots)
+11) !OLD MODELS! contains the models from the previous version, ported from the original, to Garry's Mod, to Goldsrc. The scripts haven't been written with them in mind though.
 
 Plugin TBM, but you can probably just `#include "weapons"` and call `q2weapons::Register();`  
 Ammo items are in `items` though  
