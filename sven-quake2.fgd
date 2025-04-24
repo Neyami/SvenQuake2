@@ -1,11 +1,59 @@
 @include "../svencoop/sven-coop.fgd"  
-@include "sven-quake2-items.fgd" 
+//@include "sven-quake2-items.fgd" 
 
-@BaseClass = Quake2
+@BaseClass = Alpha
 [
-    health_multiplier(string) : "Set health based on multiplier of base health" : "1.0"
+	alpha(string) : "Alpha"
+]
 
-	power_armor_power(integer) : "Override power armor amount" : "100"
+@BaseClass = Scale
+[
+	scale(string) : "Scale"
+]
+
+@BaseClass = EditorFlags
+[
+    spawnflags(Flags) =
+    [
+        256 : "Not in Easy" : 0
+        512 : "Not in Normal" : 0
+        1024 : "Not in Hard" : 0
+		2048 : "DON'T USE THIS (Not in DM)" : 0
+        4096 : "Don't Respawn" : 0
+		//This was originally 2048
+        65536 : "Not in Deathmatch" : 0
+    ]
+]
+
+// Entity will call G_UseTargets
+@BaseClass = UseTargets
+[
+	target(target_destination) : "Target to fire"
+	delay(string) : "Target delay"
+	message(string): "Message on activation"
+	killtarget(target_destination) : "Targets to fully delete"
+]
+
+@BaseClass base(EditorFlags, Targetname, Target, Scale, Alpha) color(255 128 0) size(-16 -16 -24, 16 16 32) = Quake2Monster
+[
+    spawnflags(Flags) =
+    [
+        1 : "Ambush (No Idle Sounds)" : 0
+        2 : "Trigger Spawn" : 0
+		4 : "Ambush Override (don't use)" : 0
+        65536 : "Spawn Dead (NYI)" : 0
+        131072 : "Super Step (NYI)" : 0
+		262144 : "drop to ground (NYI)" : 0
+    ]
+    combattarget(target_destination) : "Point combat target (NYI)"
+    deathtarget(target_destination) : "Entity to trigger at death"
+    healthtarget(target_destination) : "Entity to trigger when health hits target"
+    itemtarget(target_destination) : "Entity to trigger when item dropped by this monster is picked up"
+    killtarget(target_destination) : "Entity to remove at death"
+    item(string) : "Spawn Item"
+    health_multiplier(string) : "Set health based on multiplier of base health" : "1.0"
+	dead_frame(integer) : "Frame to spawn dead monsters on (NYI)" : 0
+	power_armor_power(integer) : "Override power armor amount"
 	power_armor_type(Choices) : "Override power armor type" : 0 =
     [
         0 : "None"
@@ -14,55 +62,254 @@
     ]
 ]
 
-@PointClass base(Monster, Quake2) size(-16 -16 0, 16 16 80) studio("models/quake2/monsters/soldier/soldier.mdl") = npc_q2soldier : "Quake 2 Guard"
+@PointClass base(Quake2Monster) size(-16 -16 0, 16 16 80) studio("models/quake2/monsters/soldier/soldier.mdl") skin(0) = npc_q2soldier_light : "Quake 2 Light Soldier"
 [
-	weapons(Choices) : "Weapons" : 1 =
+	skin(integer) : "Skin" : 0
+]
+
+@PointClass base(Quake2Monster) size(-16 -16 0, 16 16 80) studio("models/quake2/monsters/soldier/soldier.mdl") skin(2) = npc_q2soldier : "Quake 2 Soldier"
+[
+	skin(integer) : "Skin" : 2
+]
+
+@PointClass base(Quake2Monster) size(-16 -16 0, 16 16 80) studio("models/quake2/monsters/soldier/soldier.mdl") skin(4) = npc_q2soldier_ss : "Quake 2 SS Soldier"
+[
+	skin(integer) : "Skin" : 4
+]
+
+@PointClass base(Quake2Monster) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/flyer/flyer.mdl") = npc_q2flyer : "Quake 2 Flyer" []
+
+@PointClass base(Quake2Monster) size(-16 -16 0, 16 16 80) studio("models/quake2/monsters/enforcer/enforcer.mdl") = npc_q2enforcer : "Quake 2 Enforcer" []
+
+@PointClass base(Quake2Monster) size(-16 -16 0, 16 16 80) studio("models/quake2/monsters/ironmaiden/ironmaiden.mdl") = npc_q2ironmaiden : "Quake 2 Iron Maiden" []
+
+@PointClass base(Quake2Monster) size(-16 -16 0, 16 16 42) studio("models/quake2/monsters/parasite/parasite.mdl") = npc_q2parasite : "Quake 2 Parasite" []
+
+@PointClass base(Quake2Monster) size(-16 -16 0, 16 16 88) studio("models/quake2/monsters/gunner/gunner.mdl") = npc_q2gunner : "Quake 2 Gunner" []
+
+@PointClass base(Quake2Monster) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/berserker/berserker.mdl") = npc_q2berserker : "Quake 2 Berserker" []
+
+@PointClass base(Quake2Monster) size(-32 -32 0, 32 32 90) studio("models/quake2/monsters/gladiator/gladiator.mdl") = npc_q2gladiator : "Quake 2 Gladiator" []
+
+@PointClass base(Quake2Monster) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/tank/tank.mdl") = npc_q2tank : "Quake 2 Tank" []
+
+@PointClass base(Quake2Monster) size(-32 -32 0, 32 32 128) studio("models/quake2/monsters/tank/tank.mdl") skin(2) = npc_q2tankc : "Quake 2 Tank Commander" 
+[
+	speed(string) : "Homing Missile Speed" : "0.0"
+    guardian(Choices) : "N64 Guardian" : 0 =
+    [
+        0 : "No"
+        1 : "Yes (Larger and more health)"
+    ]
+    heatseeking(Choices) : "Heat-Seeking Missiles" : 0 =
+    [
+        0 : "No"
+        1 : "Yes"
+    ]
+]
+
+@PointClass base(Quake2Monster) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/supertank/supertank.mdl") = npc_q2supertank : "Quake 2 Super Tank" 
+[
+    boss(Choices) : "Super Tank Boss" : 0 =
+    [
+        0 : "No"
+        1 : "Yes (Power shield and heat-seeking rockets)"
+    ]
+]
+
+@PointClass base(Quake2Monster) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/jorg/jorg.mdl") = npc_q2jorg : "Quake 2 Jorg" 
+[
+	holder_can_drop(choices) : "Holder: Allowed to drop" : 1 =
 	[
-		1  : "Blaster"
-		2  : "Shotgun"
-		4  : "Machine Gun"
-		8  : "Random"
+		0 : "No"
+		1 : "Yes"
 	]
-]
-
-@PointClass base(Monster, Quake2) size(-16 -16 0, 16 16 80) studio("models/quake2/monsters/enforcer/enforcer.mdl") = npc_q2enforcer : "Quake 2 Enforcer" []
-
-@PointClass base(Monster, Quake2) size(-16 -16 0, 16 16 80) studio("models/quake2/monsters/ironmaiden/ironmaiden.mdl") = npc_q2ironmaiden : "Quake 2 Iron Maiden" []
-
-@PointClass base(Monster, Quake2) size(-16 -16 0, 16 16 42) studio("models/quake2/monsters/parasite/parasite.mdl") = npc_q2parasite : "Quake 2 Parasite" []
-
-@PointClass base(Monster, Quake2) size(-16 -16 0, 16 16 88) studio("models/quake2/monsters/gunner/gunner.mdl") = npc_q2gunner : "Quake 2 Gunner" []
-
-@PointClass base(Monster, Quake2) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/berserker/berserker.mdl") = npc_q2berserker : "Quake 2 Berserker" []
-
-@PointClass base(Monster, Quake2) size(-32 -32 0, 32 32 90) studio("models/quake2/monsters/gladiator/gladiator.mdl") = npc_q2gladiator : "Quake 2 Gladiator" []
-
-@PointClass base(Monster, Quake2) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/tank/tank.mdl") = npc_q2tank : "Quake 2 Tank" []
-
-@PointClass base(Monster, Quake2) size(-32 -32 0, 32 32 128) studio("models/quake2/monsters/tank/tank.mdl") skin(2) = npc_q2tankc : "Quake 2 Tank Commander" 
-[
-	speed(float) : "Homing Missile Speed" : "0.0"
-    weapons(Choices) : "Custom Spawnflags" : 0 =
+    norider(Choices) : "Spawn without Makron as rider?" : 0 =
     [
-        8 : "N64 Guardian"
-		16 : "Heat-Seeking Missiles"
+        0 : "No"
+        1 : "Yes (no bfg, and Makron won't spawn upon death)"
     ]
 ]
 
-@PointClass base(Monster, Quake2) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/supertank/supertank.mdl") = npc_q2supertank : "Quake 2 Super Tank" 
+@PointClass base(Quake2Monster) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/makron/makron.mdl") = npc_q2makron : "Quake 2 Makron" []
+
+
+
+
+
+//ENTITIES
+// not visible in DM mode
+//EWT_base_BModel
+@SolidClass base(EditorFlags, Targetname, UseTargets) color(0 128 204) = func_explosive : "Exploding/Breakable brush"
 [
-    weapons(Choices) : "Custom Spawnflags" : 0 =
+    spawnflags(Flags) =
     [
-        8 : "Boss (Power shield and heat-seeking rockets"
+        1 : "Trigger Spawn" : 0
+        2 : "Animated" : 0
+        4 : "Animated Fast" : 0
+    ]
+    health(float) : "Health" : "100"
+    mass(integer) : "Mass (debris)" : "75"
+    dmg(float) : "Damage" : "0"
+    sounds(choices) : "Sounds" : 0 =
+    [
+        0 : "Silent"
+        1 : "Glass Break"
     ]
 ]
 
-@PointClass base(Monster, Quake2) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/jorg/jorg.mdl") = npc_q2jorg : "Quake 2 Jorg" 
+@PointClass base(EditorFlags, Targetname, UseTargets) color(76 25 153) size(-8 -8 -8, 8 8 8) = func_timer : "Timer"
 [
-    weapons(Choices) : "Custom Spawnflags" : 0 =
+    spawnflags(Flags) =
     [
-        1024 : "No rider (no bfg, and Makron won't spawn upon death)"
+        1 : "Start On" : 0
+    ]
+    wait(string) : "Base wait time" : "1"
+    random(string) : "Wait variance (+/-) - should be <= wait"
+    delay(string) : "Delay before firing when used"
+    pausetime(string) : "Additional delay for START_ON timers"
+]
+
+@PointClass base(EditorFlags) color(255 128 0) size(-16 -16 0, 16 16 16) studio("models/quake2/deadbods/dude.mdl") = misc_deadsoldier : "Dead guys! 6 of em!"
+[
+    sequence(choices) : "Body Position" : 0 =
+    [
+        0 : "On Back"
+        1 : "On Stomach"
+        2 : "Back, Decap"
+        3 : "Fetal Position"
+        4 : "Sitting, Decap"
+        5 : "Impaled"
     ]
 ]
 
-@PointClass base(Monster, Quake2) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/makron/makron.mdl") = npc_q2makron : "Quake 2 Makron" []
+@PointClass base(EditorFlags) color(0 128 204) size(-16 -16 0, 16 16 40) studio("models/quake2/objects/barrels.mdl") = misc_explobox : "Large exploding box"
+[
+    mass(string) : "Mass" : "100"
+    health(string) : "Health" : "80"
+    damage(string) : "Damage" : "150"
+]
+
+@PointClass base(EditorFlags, Targetname, Target) color(0 255 0) size(-2 -2 -12, 2 2 12) studio("models/quake2/objects/minelite/light2.mdl") = light_mine2 : "Dusty fluorescent light fixture"   []
+
+// using a "wait" value of -1 on a path corner causes a func_train to go silent between
+// itself and the next path corner when the train is restarted. The train's sound will
+// resume as soon as it reaches a path corner with a "wait" value other than -1
+@PointClass base(EditorFlags, Targetname, UseTargets) color(128 76 0) size(-8 -8 -8, 8 8 8) = path_corner_q2 : "Path marker"
+[
+    spawnflags(Flags) =
+    [
+        1 : "Teleport" : 0
+    ]
+    target(target_destination) : "Next path target"
+    pathtarget(target_destination) : "Event to trigger"
+    wait(choices) : "Wait" : 0 =
+    [
+        -1 : "Wait for retrigger"
+    ]
+]
+
+@PointClass base(EditorFlags, Targetname, UseTargets) color(128 76 9) size(-8 -8 -8, 8 8 8) = point_combat : "Point of combat - should be the first/only target of a monster"
+[
+    spawnflags(Flags) =
+    [
+        1 : "Hold" : 0
+    ]
+    target(target_destination) : "Next path target"
+    pathtarget(target_destination) : "Event to trigger"
+    wait(choices) : "Wait" : 0 =
+    [
+        -1 : "Wait for retrigger"
+    ]
+]
+
+@PointClass base(EditorFlags, Targetname, Angles) color(255 0 0) size(-8 -8 -8, 8 8 8) = target_blaster : "Blaster (use angles to point it)"
+[
+    spawnflags(Flags) =
+    [
+        1 : "No Trail" : 0
+        2 : "No Effects" : 0
+    ]
+    dmg(string) : "Damage" : "15"
+    speed(string) : "Speed" : "1000"
+]
+
+@PointClass base(EditorFlags, Targetname, UseTargets) color(255 0 255) size(-8 -8 -8, 8 8 8) = target_goal : "Counts a goal completed"
+[
+    spawnflags(Flags) =
+    [
+        1 : "Keep Music" : 0
+    ]
+]
+
+@PointClass base(EditorFlags, Targetname) color(255 0 255) size(-8 -8 -8, 8 8 8) = target_help : "Computer help message"
+[
+    spawnflags(Flags) =
+    [
+        1 : "Main Objective" : 0
+    ]
+    message(string) : "Computer message"
+]
+
+@PointClass base(EditorFlags, Targetname, UseTargets) color(255 0 255) size(-8 -8 -8, 8 8 8) = target_secret : "Counts a secret found"
+[
+    message(string) : "Message to print"
+	noise(sound) : "Noise to play" : "misc/secret.wav"
+]
+
+@PointClass iconsprite("sprites/vhe-iconsprites/ambient_generic.spr") base(EditorFlags, Targetname) color(255 0 0) size(-8 -8 -8, 8 8 8) = target_speaker : "Sound player"
+[
+    spawnflags(Flags) =
+    [
+        1 : "Looped On" : 0
+        2 : "Looped Off" : 0
+        4 : "Reliable (UNUSED)" : 0
+        8 : "No Stereo Panning (UNUSED)" : 0
+    ]
+    noise(sound) : "Sound (path/file.wav)"
+    attenuation(Choices) : "Attenuation" : 0 =
+    [
+        -1 : "None, send to whole level"
+		0 : "Default (1 for non-looped, 3 for looped)"
+        1 : "Normal fighting sounds"
+        2 : "Idle sound level"
+        3 : "Ambient sound level"
+    ]
+    volume(string) : "Volume (0.0 - 1.0)" : "1"
+]
+
+// "sounds" values other than 1 are silent.  leaving in the other
+// options for availability to mods/fixes
+//
+@PointClass base(EditorFlags, Targetname) color(255 0 0) size(-8 -8 -8, 8 8 8) = target_splash : "Creates a splash when used"
+[
+    sounds(choices) : "Type of splash" : 2 =
+    [
+        1 : "Sparks"
+        2 : "Blue water"
+        3 : "Brown water"
+        4 : "Slime"
+        5 : "Lava"
+        6 : "Blood"
+    ]
+    count(integer) : "Number of pixels in splash (1 - 255)"
+    dmg(float) : "Radius damage"
+]
+
+@PointClass base(EditorFlags, UseTargets) color(128 128 128) size(-8 -8 -8, 8 8 8) = trigger_always : "Always triggers" []
+
+@PointClass base(EditorFlags, Targetname, UseTargets) color(128 128 128) size(-8 -8 -8, 8 8 8) = trigger_counter_q2 : "Counter"
+[
+    spawnflags(Flags) =
+    [
+        1 : "No Message" : 0
+    ]
+    count(integer) : "Count before trigger" : 2
+]
+
+@PointClass base(EditorFlags, Targetname, UseTargets) color(128 128 128) size(-8 -8 -8, 8 8 8) = trigger_key : "Triggers with key, CREATE AFTER THE KEY"
+[
+    item(string) : "Item classname" : "key_blue_key"
+]
+
+//@PointClass base(Quake2Monster) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/template/template.mdl") = npc_q2template : "Quake 2 template" []
