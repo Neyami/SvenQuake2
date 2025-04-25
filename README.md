@@ -32,9 +32,17 @@ Models, textures, sounds, sprites, maps by iD Software.
 
 ## STROGG GUARD ##  
 [Video](https://youtu.be/-_un4iP4fSQ?si=OQuB892iQe9vUACN)  
+`npc_q2soldier_light`  
 `npc_q2soldier`  
+`npc_q2soldier_ss`  
 
-Refer to `sven-quake2.fgd` to see the keyvalues that set the weapons  
+
+<BR>
+
+
+## FLYER ##  
+[Video](https://www.youtube.com/watch?v=da9pMN7wgjA)  
+`npc_q2flyer`  
 
 
 <BR>
@@ -130,13 +138,23 @@ weapon_q2weaponname doesn't
 
 
 ## BLASTER ##  
+Slot: 1  
 Weapon Entity: `weapon_q2blaster`  
+
+
+<BR>
+
+
+## CHAINFIST ##  
+Slot: 1  
+Weapon Entity: `weapon_q2chainfist`  
 
 
 <BR> 
 
 
 ## SHOTGUN ##  
+Slot: 2  
 Weapon Entity: `weapon_q2shotgun`  
 Pickup Entity: `item_q2shotgun`  
 Ammo Name: `q2shells`  
@@ -147,6 +165,7 @@ Ammo Entity: `ammo_q2shells`
 
 
 ## SUPER SHOTGUN ##  
+Slot: 3  
 Weapon Entity: `weapon_q2supershotgun`  
 Pickup Entity: `item_q2supershotgun`  
 Ammo Name: `q2shells`  
@@ -157,6 +176,7 @@ Ammo Entity: `ammo_q2shells`
 
 
 ## MACHINE GUN ##  
+Slot: 4  
 Weapon Entity: `weapon_q2machinegun`  
 Pickup Entity: `item_q2machinegun`  
 Ammo Name: `q2bullets`  
@@ -167,6 +187,7 @@ Ammo Entity: `ammo_q2bullets`
 
 
 ## CHAINGUN ##  
+Slot: 5  
 Weapon Entity: `weapon_q2chaingun`  
 Pickup Entity: `item_q2chaingun`  
 Ammo Name: `q2bullets`  
@@ -177,6 +198,7 @@ Ammo Entity: `ammo_q2bullets`
 
 
 ## HAND GRENADES ##  
+Slot: 6  
 Weapon Entity: `weapon_q2grenades`  
 Ammo Name: `q2grenades`  
 Ammo Entity: `ammo_q2grenades`  
@@ -186,6 +208,7 @@ Ammo Entity: `ammo_q2grenades`
 
 
 ## GRENADE LAUNCHER ##  
+Slot: 6  
 Weapon Entity: `weapon_q2grenadelauncher`  
 Pickup Entity: `item_q2grenadelauncher`  
 Ammo Name: `q2grenades`  
@@ -196,6 +219,7 @@ Ammo Entity: `ammo_q2grenades`
 
 
 ## ROCKET LAUNCHER ##  
+Slot: 7  
 Weapon Entity: `weapon_q2rocketlauncher`  
 Pickup Entity: `item_q2rocketlauncher`  
 Ammo Name: `q2rockets`  
@@ -206,6 +230,7 @@ Ammo Entity: `ammo_q2rockets`
 
 
 ## HYPER BLASTER ##  
+Slot: 8  
 Weapon Entity: `weapon_q2hyperblaster`  
 Pickup Entity: `item_q2hyperblaster`  
 Ammo Name: `q2cells`  
@@ -215,7 +240,19 @@ Ammo Entity: `ammo_q2cells`
 <BR> 
 
 
+## PLASMA BEAM ##  
+Slot: 8  
+Weapon Entity: `weapon_q2plasmabeam`  
+Pickup Entity: `item_q2plasmabeam`  
+Ammo Name: `q2cells`  
+Ammo Entity: `ammo_q2cells`  
+
+
+<BR> 
+
+
 ## RAILGUN ##  
+Slot: 9  
 Weapon Entity: `weapon_q2railgun`  
 Pickup Entity: `item_q2railgun`  
 Ammo Name: `q2slugs`  
@@ -226,6 +263,7 @@ Ammo Entity: `ammo_q2slugs`
 
 
 ## BFG 10K ##  
+Slot: 10  
 Weapon Entity: `weapon_q2bfg`  
 Pickup Entity: `item_q2bfg`  
 Ammo Name: `q2cells`  
@@ -559,6 +597,13 @@ Gives 60 bullets and shells (without going over the max)
 `item_pack`  
 Increases max ammo for all Quake 2 ammo  
 Gives 180 to all ammo (without going over the max)  
+
+
+<BR>
+
+
+## INVISIBILITY ##  
+`item_invisibility`  
 
 
 <BR>
