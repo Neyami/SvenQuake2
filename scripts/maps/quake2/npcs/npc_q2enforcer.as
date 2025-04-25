@@ -61,7 +61,7 @@ final class npc_q2enforcer : CBaseQ2NPC
 {
 	private float m_flStopShooting;
 
-	void Spawn()
+	void MonsterSpawn()
 	{
 		Precache();
 
@@ -81,15 +81,11 @@ final class npc_q2enforcer : CBaseQ2NPC
 			self.m_FormattedName	= "Enforcer";
 
 		m_flGibHealth = -65.0;
-
-		CommonSpawn();
+		SetMass( 200 );
 
 		@this.m_Schedules = @enforcer_schedules;
 
 		self.MonsterInit();
-
-		if( self.IsPlayerAlly() )
-			SetUse( UseFunction(this.FollowerUse) );
 	}
 
 	void Precache()
@@ -109,11 +105,6 @@ final class npc_q2enforcer : CBaseQ2NPC
 			g_SoundSystem.PrecacheSound( arrsNPCSounds[i] );
 	}
 
-	void FollowerUse( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
-	{
-		self.FollowerPlayerUse( pActivator, pCaller, useType, flValue );
-	}
-
 	void SetYawSpeed() //SUPER IMPORTANT, NPC WON'T DO ANYTHING WITHOUT THIS :aRage:
 	{
 		int ys = 120;
@@ -128,7 +119,7 @@ final class npc_q2enforcer : CBaseQ2NPC
 		return CLASS_ALIEN_MILITARY;
 	}
 
-	void AlertSound()
+	void MonsterAlertSound()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_SIGHT], VOL_NORM, ATTN_NORM );
 	}
@@ -136,6 +127,15 @@ final class npc_q2enforcer : CBaseQ2NPC
 	void SearchSound()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_SEARCH], VOL_NORM, ATTN_NORM );
+	}
+
+	void MonsterIdle()
+	{
+		if( self.m_hEnemy.IsValid() )
+			return;
+
+		self.ChangeSchedule( slEnforcerFidget );
+		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_IDLE], VOL_NORM, ATTN_IDLE );
 	}
 
 	void HandleAnimEventQ2( MonsterEvent@ pEvent )
@@ -189,7 +189,7 @@ final class npc_q2enforcer : CBaseQ2NPC
 					CGib@ pGib = g_EntityFuncs.CreateGib( pev.origin + Vector(0, 0, NPC_MAXS.z), g_vecZero );
 					pGib.Spawn( MODEL_GIB_HEAD );
 
-					pGib.pev.velocity = VelocityForDamage( 200 );
+					pGib.pev.velocity = q2::VelocityForDamage( 200 );
 
 					pGib.pev.velocity.x += Math.RandomFloat( -0.15, 0.15 );
 					pGib.pev.velocity.y += Math.RandomFloat( -0.25, 0.15 );
@@ -253,6 +253,8 @@ final class npc_q2enforcer : CBaseQ2NPC
 		if( pev.deadflag == DEAD_NO )
 			HandlePain( flDamage );
 
+		M_ReactToDamage( g_EntityFuncs.Instance(pevAttacker) );
+
 		return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
 	}
 
@@ -283,15 +285,15 @@ final class npc_q2enforcer : CBaseQ2NPC
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_DEATH_GIB], VOL_NORM, ATTN_NORM );
 
-		ThrowGib( 1, MODEL_GIB_BONE, pev.dmg, -1, BREAK_FLESH );
-		ThrowGib( 3, MODEL_GIB_MEAT, pev.dmg, -1, BREAK_FLESH );
-		ThrowGib( 1, MODEL_GIB_CHEST, pev.dmg, 5, BREAK_FLESH );
-		ThrowGib( 1, MODEL_GIB_GUN, pev.dmg, 9 );
-		ThrowGib( 1, MODEL_GIB_FOOT, pev.dmg, 4, BREAK_FLESH );
-		ThrowGib( 1, MODEL_GIB_FOOT, pev.dmg, 17, BREAK_FLESH );
-		ThrowGib( 1, MODEL_GIB_ARM, pev.dmg, 8, BREAK_FLESH );
-		ThrowGib( 1, MODEL_GIB_ARM, pev.dmg, 12, BREAK_FLESH );
-		ThrowGib( 1, MODEL_GIB_HEAD, pev.dmg, 6, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_BONE, pev.dmg, -1, BREAK_FLESH );
+		q2::ThrowGib( self, 3, MODEL_GIB_MEAT, pev.dmg, -1, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_CHEST, pev.dmg, 5, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_GUN, pev.dmg, 9 );
+		q2::ThrowGib( self, 1, MODEL_GIB_FOOT, pev.dmg, 4, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_FOOT, pev.dmg, 17, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_ARM, pev.dmg, 8, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_ARM, pev.dmg, 12, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_HEAD, pev.dmg, 6, BREAK_FLESH );
 
 		SetThink( ThinkFunction(this.SUB_Remove) );
 		pev.nextthink = g_Engine.time;
@@ -349,11 +351,26 @@ final class npc_q2enforcer : CBaseQ2NPC
 
 array<ScriptSchedule@>@ enforcer_schedules;
 
+ScriptSchedule slEnforcerFidget
+(
+	bits_COND_NEW_ENEMY		|
+	bits_COND_SEE_FEAR			|
+	bits_COND_LIGHT_DAMAGE	|
+	bits_COND_HEAVY_DAMAGE	|
+	bits_COND_PROVOKED,
+	0,
+	"Enforcer Idle Fidgeting"
+);
+
 void InitSchedules()
 {
 	InitQ2BaseSchedules();
 
-	array<ScriptSchedule@> scheds = { slQ2Pain1, slQ2Pain2 };
+	slEnforcerFidget.AddTask( ScriptTask(TASK_STOP_MOVING) );
+	slEnforcerFidget.AddTask( ScriptTask(TASK_PLAY_SEQUENCE, float(ACT_TWITCH)) );
+	slEnforcerFidget.AddTask( ScriptTask(TASK_SET_ACTIVITY, float(ACT_IDLE)) );
+
+	array<ScriptSchedule@> scheds = { slQ2Pain1, slQ2Pain2, slEnforcerFidget };
 
 	@enforcer_schedules = @scheds;
 }

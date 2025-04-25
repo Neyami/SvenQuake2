@@ -74,8 +74,30 @@ enum q2sounds_e
 final class npc_q2tank : CBaseQ2NPC
 {
 	private bool m_bGibbed;
+	private bool m_bGuardian;
+	private bool m_bHeatSeeking;
 
-	void Spawn()
+	bool MonsterKeyValue( const string& in szKey, const string& in szValue )
+	{
+		if( szKey == "guardian" )
+		{
+			if( atoi(szValue) >= 1 )
+				m_bGuardian = true;
+
+			return true;
+		}
+		else if( szKey == "heatseeking" )
+		{
+			if( atoi(szValue) >= 1 )
+				m_bHeatSeeking = true;
+
+			return true;
+		}
+
+		return false;
+	}
+
+	void MonsterSpawn()
 	{
 		Precache();
 
@@ -96,7 +118,7 @@ final class npc_q2tank : CBaseQ2NPC
 			m_flGibHealth			= -225.0;
 		}
 
-		if( (pev.weapons & q2npc::SPAWNFLAG_TANK_COMMANDER_GUARDIAN) != 0 )
+		if( m_bGuardian )
 		{
 			if( pev.scale <= 0 )
 				pev.scale = 1.5;
@@ -124,14 +146,11 @@ final class npc_q2tank : CBaseQ2NPC
 
 		m_flHeatTurnRate			= ROCKET_HEATSEEKING;
 
-		CommonSpawn();
+		SetMass( 500 );
 
 		@this.m_Schedules = @tank_schedules;
 
 		self.MonsterInit();
-
-		if( self.IsPlayerAlly() )
-			SetUse( UseFunction(this.FollowerUse) );
 	}
 
 	void Precache()
@@ -150,11 +169,6 @@ final class npc_q2tank : CBaseQ2NPC
 
 		for( i = 0; i < arrsNPCSounds.length(); ++i )
 			g_SoundSystem.PrecacheSound( arrsNPCSounds[i] );
-	}
-
-	void FollowerUse( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
-	{
-		self.FollowerPlayerUse( pActivator, pCaller, useType, flValue );
 	}
 
 	void SetYawSpeed() //SUPER IMPORTANT, NPC WON'T DO ANYTHING WITHOUT THIS :aRage:
@@ -178,12 +192,12 @@ final class npc_q2tank : CBaseQ2NPC
 	//don't run away at low health!
 	int IgnoreConditions() { return ( bits_COND_SEE_FEAR | bits_COND_LIGHT_DAMAGE | bits_COND_HEAVY_DAMAGE ); }
 
-	void IdleSoundQ2()
+	void MonsterIdle()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_IDLE], VOL_NORM, ATTN_IDLE );
 	}
 
-	void AlertSound()
+	void MonsterAlertSound()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_SIGHT], VOL_NORM, ATTN_NORM );
 	}
@@ -389,7 +403,7 @@ final class npc_q2tank : CBaseQ2NPC
 				float flRocketSpeed;
 				if( pev.speed > 0.0 )
 					flRocketSpeed = pev.speed;
-				else if( (pev.weapons & q2npc::SPAWNFLAG_TANK_COMMANDER_HEAT_SEEKING) != 0 ) 
+				else if( m_bHeatSeeking ) 
 					flRocketSpeed = ROCKET_SPEED_HEAT;
 				else
 					flRocketSpeed = ROCKET_SPEED;
@@ -407,7 +421,7 @@ final class npc_q2tank : CBaseQ2NPC
 
 				monster_muzzleflash( vecStart, 255, 128, 51 );
 
-				if( (pev.weapons & q2npc::SPAWNFLAG_TANK_COMMANDER_HEAT_SEEKING) != 0 ) 
+				if( m_bHeatSeeking ) 
 					monster_fire_weapon( q2npc::WEAPON_HEATSEEKING, vecStart, vecAim, ROCKET_DMG, ROCKET_SPEED_HEAT );
 				else
 					monster_fire_weapon( q2npc::WEAPON_ROCKET, vecStart, vecAim, ROCKET_DMG, ROCKET_SPEED );
@@ -448,6 +462,8 @@ final class npc_q2tank : CBaseQ2NPC
 		//don't send the tank flying unless the damage is very high (nukes?)
 		if( flDamage < 500 )
 			bitsDamageType &= ~DMG_BLAST|DMG_LAUNCH;
+
+		M_ReactToDamage( g_EntityFuncs.Instance(pevAttacker) );
 
 		return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
 	}
@@ -493,7 +509,7 @@ final class npc_q2tank : CBaseQ2NPC
 	}
 
 	//Overridden to remove the arm upon normal death
-	void Killed( entvars_t@ pevAttacker, int iGib )
+	void MonsterKilled( entvars_t@ pevAttacker, int iGib )
 	{
 		if( !m_bGibbed and pev.deadflag == DEAD_NO )
 		{
@@ -501,21 +517,19 @@ final class npc_q2tank : CBaseQ2NPC
 
 			DropArm();
 		}
-
-		BaseClass.Killed( pevAttacker, iGib );
 	}
 
 	void GibMonster()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_DEATH_GIB], VOL_NORM, ATTN_NORM );
 
-		ThrowGib( 1, MODEL_GIB_MEAT, pev.dmg, -1, BREAK_FLESH );
-		ThrowGib( 3, MODEL_GIB_METAL, pev.dmg, -1, BREAK_METAL );
-		ThrowGib( 1, MODEL_GIB_GEAR, pev.dmg, -1, BREAK_METAL );
-		ThrowGib( 2, MODEL_GIB_FOOT, pev.dmg, 20, BREAK_CONCRETE, pev.skin / 2 );
-		ThrowGib( 2, MODEL_GIB_THIGH, pev.dmg, 14, BREAK_CONCRETE, pev.skin / 2 );
-		ThrowGib( 1, MODEL_GIB_CHEST, pev.dmg, 2, BREAK_CONCRETE, pev.skin / 2 );
-		ThrowGib( 1, MODEL_GIB_HEAD, pev.dmg, 10, BREAK_CONCRETE, pev.skin / 2 );
+		q2::ThrowGib( self, 1, MODEL_GIB_MEAT, pev.dmg, -1, BREAK_FLESH );
+		q2::ThrowGib( self, 3, MODEL_GIB_METAL, pev.dmg, -1, BREAK_METAL );
+		q2::ThrowGib( self, 1, MODEL_GIB_GEAR, pev.dmg, -1, BREAK_METAL );
+		q2::ThrowGib( self, 2, MODEL_GIB_FOOT, pev.dmg, 20, BREAK_CONCRETE, pev.skin / 2 );
+		q2::ThrowGib( self, 2, MODEL_GIB_THIGH, pev.dmg, 14, BREAK_CONCRETE, pev.skin / 2 );
+		q2::ThrowGib( self, 1, MODEL_GIB_CHEST, pev.dmg, 2, BREAK_CONCRETE, pev.skin / 2 );
+		q2::ThrowGib( self, 1, MODEL_GIB_HEAD, pev.dmg, 10, BREAK_CONCRETE, pev.skin / 2 );
 
 		if( pev.body == 0 )
 			DropArm();

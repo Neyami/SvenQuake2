@@ -10,8 +10,8 @@ final class item_power_shield : ScriptBaseItemEntity, item_q2pickup
 {
 	item_power_shield()
 	{
-		m_iItemID = IT_ITEM_POWER_SHIELD;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iItemID = q2::IT_ITEM_POWER_SHIELD;
+		m_iWorldModelFlags = q2::EF_ROTATE;
 		m_sModel = "models/quake2/items/shield.mdl";
 		m_sSound = "quake2/misc/ar3_pkup.wav";
 		m_flRespawnTime = 2.0; //60
@@ -97,10 +97,10 @@ class weapon_q2powershield : ScriptBasePlayerWeaponEntity
 		if( pCustom.GetKeyvalue(PARMOR_KVN).GetInteger() == 0 )
 		{
 			HUDNumDisplayParams hudParams;
-			q2items::GetHudParams( m_pPlayer, q2items::IT_ITEM_POWER_SHIELD, hudParams );
+			q2items::GetHudParams( m_pPlayer, q2::IT_ITEM_POWER_SHIELD, hudParams );
 			g_PlayerFuncs.HudNumDisplay( m_pPlayer, hudParams );
 
-			pCustom.SetKeyvalue( PARMOR_KVN, q2items::POWER_ARMOR_SHIELD );
+			pCustom.SetKeyvalue( PARMOR_KVN, q2::POWER_ARMOR_SHIELD );
 
 			g_SoundSystem.EmitSound( self.edict(), CHAN_ITEM, "quake2/misc/power1.wav", VOL_NORM, ATTN_NORM );
 			m_bSelectLastItem = true;

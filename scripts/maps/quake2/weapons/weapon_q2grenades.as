@@ -144,8 +144,7 @@ class weapon_q2grenades : CBaseQ2Weapon
 
 	void PrimaryAttack()
 	{
-		int ammo = m_pPlayer.m_rgAmmo( self.m_iPrimaryAmmoType );
-		if( ammo <= 0 )
+		if( m_pPlayer.m_rgAmmo(self.m_iPrimaryAmmoType) <= 0 )
 		{
 			self.PlayEmptySound();
 			self.m_flNextPrimaryAttack = g_Engine.time + 0.3;
@@ -254,7 +253,7 @@ class weapon_q2grenades : CBaseQ2Weapon
 
 		fire_grenade2( pev.origin, vecThrow, Q2W_DAMAGE, flTime, Q2W_RADIUS );
 
-		m_pPlayer.m_rgAmmo( self.m_iPrimaryAmmoType, m_pPlayer.m_rgAmmo(self.m_iPrimaryAmmoType) - 1 );
+		G_RemoveAmmo( 1 );
 		m_fAttackStart = 0.0;
 
 		BaseClass.ItemPreFrame();

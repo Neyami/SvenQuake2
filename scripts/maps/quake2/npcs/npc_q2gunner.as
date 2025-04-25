@@ -74,7 +74,7 @@ final class npc_q2gunner : CBaseQ2NPC
 {
 	private float m_flGrenadeCooldown;
 
-	void Spawn()
+	void MonsterSpawn()
 	{
 		AppendAnims();
 
@@ -96,15 +96,11 @@ final class npc_q2gunner : CBaseQ2NPC
 			self.m_FormattedName	= "Gunner";
 
 		m_flGibHealth = -70.0;
-
-		CommonSpawn();
+		SetMass( 200 );
 
 		@this.m_Schedules = @gunner_schedules;
 
 		self.MonsterInit();
-
-		if( self.IsPlayerAlly() )
-			SetUse( UseFunction(this.FollowerUse) );
 	}
 
 	void AppendAnims()
@@ -128,11 +124,6 @@ final class npc_q2gunner : CBaseQ2NPC
 			g_SoundSystem.PrecacheSound( arrsNPCSounds[i] );
 	}
 
-	void FollowerUse( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
-	{
-		self.FollowerPlayerUse( pActivator, pCaller, useType, flValue );
-	}
-
 	void SetYawSpeed() //SUPER IMPORTANT, NPC WON'T DO ANYTHING WITHOUT THIS :aRage:
 	{
 		int ys = 120;
@@ -147,7 +138,7 @@ final class npc_q2gunner : CBaseQ2NPC
 		return CLASS_ALIEN_MILITARY;
 	}
 
-	void AlertSound()
+	void MonsterAlertSound()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_SIGHT], VOL_NORM, ATTN_NORM );
 	}
@@ -294,9 +285,7 @@ final class npc_q2gunner : CBaseQ2NPC
 			//I SURE WISH THE DEVS WOULD HAVE USED ONLY ONE WAY OF DETERMINING WHEN TO FIDGET :aRage:
 			case AE_FIDGETCHECK:
 			{
-				if( Math.RandomFloat(0.0, 1.0) <= 0.05 )
-					self.ChangeSchedule( slGunnerFidget );
-
+				gunner_fidget();
 				break;
 			}
 
@@ -325,6 +314,20 @@ final class npc_q2gunner : CBaseQ2NPC
 
 				break;
 			}
+		}
+	}
+
+	void gunner_fidget()
+	{
+		if( !HasFlags(m_iSpawnFlags, q2npc::SPAWNFLAG_MONSTER_AMBUSH) )
+		{
+			/*if( HasFlags(monsterinfo.aiflags, AI_STAND_GROUND) )
+				return;
+			else */if( self.m_hEnemy.IsValid() )
+				return;
+
+			if( Math.RandomFloat(0.0, 1.0) <= 0.05 )
+				self.ChangeSchedule( slGunnerFidget );
 		}
 	}
 
@@ -421,13 +424,13 @@ final class npc_q2gunner : CBaseQ2NPC
 
 			//try search for best pitch
 			if( M_CalculatePitchToFire(vecTarget, vecMuzzle, vecAim, 600, 2.5, false) )
-				monster_fire_weapon( q2npc::WEAPON_GRENADE, vecMuzzle, vecAim, GRENADE_DMG, GRENADE_SPEED, crandom_open() * 10.0, Math.RandomFloat(0.0, 1.0) * 10.0 );
+				monster_fire_weapon( q2npc::WEAPON_GRENADE, vecMuzzle, vecAim, GRENADE_DMG, GRENADE_SPEED, q2::crandom_open() * 10.0, Math.RandomFloat(0.0, 1.0) * 10.0 );
 			else
 			{
 				//normal shot
 				Math.MakeVectors( pev.angles );
 				vecAim = g_Engine.v_forward;
-				monster_fire_weapon( q2npc::WEAPON_GRENADE, vecMuzzle, vecAim, GRENADE_DMG, GRENADE_SPEED, crandom_open() * 10.0, 200.0 + (crandom_open() * 10.0) );
+				monster_fire_weapon( q2npc::WEAPON_GRENADE, vecMuzzle, vecAim, GRENADE_DMG, GRENADE_SPEED, q2::crandom_open() * 10.0, 200.0 + (q2::crandom_open() * 10.0) );
 			}
 		}
 		else
@@ -515,13 +518,13 @@ final class npc_q2gunner : CBaseQ2NPC
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_DEATH_GIB], VOL_NORM, ATTN_NORM );
 
-		ThrowGib( 2, MODEL_GIB_BONE, pev.dmg, -1, BREAK_FLESH );
-		ThrowGib( 2, MODEL_GIB_MEAT, pev.dmg, -1, BREAK_FLESH );
-		ThrowGib( 1, MODEL_GIB_CHEST, pev.dmg, 6, BREAK_FLESH );
-		ThrowGib( 1, MODEL_GIB_GARM, pev.dmg, 19, BREAK_METAL );
-		ThrowGib( 1, MODEL_GIB_GUN, pev.dmg, 9 );
-		ThrowGib( 1, MODEL_GIB_FOOT, pev.dmg, Math.RandomLong(0, 1) == 0 ? 4 : 25, BREAK_FLESH );
-		ThrowGib( 1, MODEL_GIB_HEAD, pev.dmg, 7, BREAK_FLESH );
+		q2::ThrowGib( self, 2, MODEL_GIB_BONE, pev.dmg, -1, BREAK_FLESH );
+		q2::ThrowGib( self, 2, MODEL_GIB_MEAT, pev.dmg, -1, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_CHEST, pev.dmg, 6, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_GARM, pev.dmg, 19, BREAK_METAL );
+		q2::ThrowGib( self, 1, MODEL_GIB_GUN, pev.dmg, 9 );
+		q2::ThrowGib( self, 1, MODEL_GIB_FOOT, pev.dmg, Math.RandomLong(0, 1) == 0 ? 4 : 25, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_HEAD, pev.dmg, 7, BREAK_FLESH );
 
 		SetThink( ThinkFunction(this.SUB_Remove) );
 		pev.nextthink = g_Engine.time;

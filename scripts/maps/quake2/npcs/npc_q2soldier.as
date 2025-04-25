@@ -1,6 +1,10 @@
 namespace npc_q2soldier
 {
 
+const string NPC_NAME_BLASTER	= "npc_q2soldier_light";
+const string NPC_NAME_SHOTGUN	= "npc_q2soldier";
+const string NPC_NAME_MG			= "npc_q2soldier_ss";
+
 const string NPC_MODEL				= "models/quake2/monsters/soldier/soldier.mdl";
 const string MODEL_GIB_MEAT		= "models/quake2/objects/gibs/sm_meat.mdl";
 const string MODEL_GIB_BONE		= "models/quake2/objects/gibs/bone.mdl";
@@ -13,6 +17,7 @@ const string MODEL_GIB_HEAD		= "models/quake2/monsters/soldier/gibs/head.mdl";
 const int AE_ATTACK_SHOOT			= 11;
 const int AE_ATTACK_REFIRE1		= 12;
 const int AE_ATTACK_REFIRE2		= 13;
+const int AE_FIDGETCHECK				= 14;
 
 const int NPC_HEALTH_BLASTER		= 20;
 const float BLASTER_DAMAGE			= 5;
@@ -72,6 +77,9 @@ enum q2sounds_e
 
 const array<string> arrsNPCAnims =
 {
+	"idle",
+	"idle_fidget1",
+	"idle_fidget2",
 	"attack1",
 	"attack2",
 	"pain1",
@@ -88,6 +96,9 @@ const array<string> arrsNPCAnims =
 
 enum anim_e
 {
+	ANIM_IDLE,
+	ANIM_FIDGET1,
+	ANIM_FIDGET2,
 	ANIM_ATTACK1,
 	ANIM_ATTACK2,
 	ANIM_PAIN1,
@@ -102,19 +113,11 @@ enum anim_e
 	ANIM_DEATH6
 };
 
-enum weapons_e
-{
-	WEAPON_BLASTER = 1,
-	WEAPON_SHOTGUN = 2,
-	WEAPON_MGUN = 4,
-	WEAPON_RANDOM = 8
-};
-
 final class npc_q2soldier : CBaseQ2NPC
 {
 	private float m_flStopShooting;
 
-	void Spawn()
+	void MonsterSpawn()
 	{
 		AppendAnims();
 
@@ -123,28 +126,23 @@ final class npc_q2soldier : CBaseQ2NPC
 		g_EntityFuncs.SetModel( self, NPC_MODEL );
 		g_EntityFuncs.SetSize( self.pev, NPC_MINS, NPC_MAXS );
 
-		if( pev.weapons <= 0 )
-			pev.weapons = WEAPON_BLASTER;
-		else if( pev.weapons == WEAPON_RANDOM )
-			pev.weapons = Math.RandomLong( WEAPON_BLASTER, WEAPON_MGUN );
-
 		float flHealth;
 
-		if( pev.weapons == WEAPON_SHOTGUN )
+		if( IsShotgunSoldier() )
 		{
 			pev.skin = 2;
 			flHealth = NPC_HEALTH_SHOTGUN * m_flHealthMultiplier;
 
 			if( string(self.m_FormattedName).IsEmpty() )
-				self.m_FormattedName	= "Shotgun Guard";
+				self.m_FormattedName	= "Soldier";
 		}
-		else if( pev.weapons == WEAPON_MGUN )
+		else if( IsMGSoldier() )
 		{
 			pev.skin = 4;
 			flHealth = NPC_HEALTH_MGUN * m_flHealthMultiplier;
 
 			if( string(self.m_FormattedName).IsEmpty() )
-				self.m_FormattedName	= "Machine Gun Guard";
+				self.m_FormattedName	= "Machinegun Soldier";
 		}
 		else
 		{
@@ -152,7 +150,7 @@ final class npc_q2soldier : CBaseQ2NPC
 			flHealth = NPC_HEALTH_BLASTER * m_flHealthMultiplier;
 
 			if( string(self.m_FormattedName).IsEmpty() )
-				self.m_FormattedName	= "Light Guard";
+				self.m_FormattedName	= "Light Soldier";
 		}
 
 		if( pev.health <= 0 )
@@ -165,16 +163,16 @@ final class npc_q2soldier : CBaseQ2NPC
 		self.m_afCapability			= bits_CAP_DOORS_GROUP;
 
 		m_flGibHealth = -30.0;
-
-		CommonSpawn();
+		SetMass( 100 );
 
 		@this.m_Schedules = @soldier_schedules;
 
 		self.MonsterInit();
-
-		if( self.IsPlayerAlly() )
-			SetUse( UseFunction(this.FollowerUse) );
 	}
+
+	bool IsBlasterSoldier() { return self.GetClassname() == NPC_NAME_BLASTER; }
+	bool IsShotgunSoldier() { return self.GetClassname() == NPC_NAME_SHOTGUN; }
+	bool IsMGSoldier() { return self.GetClassname() == NPC_NAME_MG; }
 
 	void AppendAnims()
 	{
@@ -197,11 +195,6 @@ final class npc_q2soldier : CBaseQ2NPC
 
 		for( i = 0; i < arrsNPCSounds.length(); ++i )
 			g_SoundSystem.PrecacheSound( arrsNPCSounds[i] );
-	}
-
-	void FollowerUse( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
-	{
-		self.FollowerPlayerUse( pActivator, pCaller, useType, flValue );
 	}
 
 	void SetYawSpeed() //SUPER IMPORTANT, NPC WON'T DO ANYTHING WITHOUT THIS :aRage:
@@ -248,7 +241,7 @@ final class npc_q2soldier : CBaseQ2NPC
 	bool CheckMeleeAttack1( float flDot, float flDist ) { return false; }
 	bool CheckMeleeAttack2( float flDot, float flDist ) { return false; }
 
-	void AlertSound()
+	void MonsterAlertSound()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_SIGHT], VOL_NORM, ATTN_NORM );
 	}
@@ -264,16 +257,24 @@ final class npc_q2soldier : CBaseQ2NPC
 		{
 			case q2npc::AE_IDLESOUND:
 			{
-				if( Math.RandomFloat(0.0, 1.0) > 0.8 )
-					g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_IDLE], VOL_NORM, ATTN_IDLE );
+				if( !HasFlags(m_iSpawnFlags, q2npc::SPAWNFLAG_MONSTER_AMBUSH) )
+				{
+					if( atoi(pEvent.options()) == 0 )
+					{
+						if( Math.RandomFloat(0.0, 1.0) > 0.8 )
+							g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_IDLE], VOL_NORM, ATTN_IDLE );
+					}
+					else
+						g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_COCK], VOL_NORM, ATTN_IDLE );
+				}
 
 				break;
 			}
 
-			case q2npc::AE_FOOTSTEP:
+			//I SURE WISH THE DEVS WOULD HAVE USED ONLY ONE WAY OF DETERMINING WHEN TO FIDGET :aRage:
+			case AE_FIDGETCHECK:
 			{
-				monster_footstep();
-
+				soldier_stand();
 				break;
 			}
 
@@ -286,14 +287,17 @@ final class npc_q2soldier : CBaseQ2NPC
 
 			case AE_ATTACK_REFIRE1:
 			{
-				if( pev.weapons != WEAPON_BLASTER )
+				if( !IsBlasterSoldier() )
 					return;
 
 				if( !self.m_hEnemy.IsValid() or self.m_hEnemy.GetEntity().pev.health <= 0 )
 					return;
 
+				//rerelease
 				//if (((frandom() < 0.5f) && visible(self, self->enemy)) || (range_to(self, self->enemy) <= RANGE_MELEE))
-				if( Math.RandomFloat(0.0, 1.0) < 0.5 or (pev.origin - self.m_hEnemy.GetEntity().pev.origin).Length2D() <= Q2_RANGE_MELEE )
+				//original
+				//if ( ((skill->value == 3) && (random() < 0.5)) || (range(self, self->enemy) == RANGE_MELEE) )
+				if( Math.RandomFloat(0.0, 1.0) < 0.5 or (pev.origin - self.m_hEnemy.GetEntity().pev.origin).Length() <= Q2_RANGE_MELEE ) //Length2D ??
 				{
 					if( GetAnim(ANIM_ATTACK1) )
 						SetFrame( 12, 1 );
@@ -313,14 +317,17 @@ final class npc_q2soldier : CBaseQ2NPC
 
 			case AE_ATTACK_REFIRE2:
 			{
-				if( pev.weapons == WEAPON_BLASTER )
+				if( IsBlasterSoldier() )
 					return;
 
 				if( !self.m_hEnemy.IsValid() or self.m_hEnemy.GetEntity().pev.health <= 0 )
 					return;
 
+				//rerelease
 				//if (((frandom() < 0.5f) && visible(self, self->enemy)) || (range_to(self, self->enemy) <= RANGE_MELEE))
-				if( Math.RandomFloat(0.0, 1.0) < 0.5 or (pev.origin - self.m_hEnemy.GetEntity().pev.origin).Length2D() <= Q2_RANGE_MELEE )
+				//original
+				//if ( ((skill->value == 3) && (random() < 0.5)) || (range(self, self->enemy) == RANGE_MELEE) )
+				if( Math.RandomFloat(0.0, 1.0) < 0.5 or (pev.origin - self.m_hEnemy.GetEntity().pev.origin).Length() <= Q2_RANGE_MELEE ) //Length2D ??
 				{
 					if( GetAnim(ANIM_ATTACK1) )
 						SetFrame( 12, 1 );
@@ -332,15 +339,41 @@ final class npc_q2soldier : CBaseQ2NPC
 			}
 
 			default:
+			{
 				BaseClass.HandleAnimEvent( pEvent );
 				break;
+			}
+		}
+	}
+
+	void soldier_stand()
+	{
+		if( m_bRerelease )
+		{
+			float r = Math.RandomFloat( 0.0, 1.0 );
+
+			if( !GetAnim(ANIM_IDLE) or r < 0.6 )
+				self.ChangeSchedule( self.GetScheduleOfType(SCHED_IDLE_STAND) ); //soldier_move_stand1
+			else if( r < 0.8 )
+				self.ChangeSchedule( slSoldierFidget1 ); //soldier_move_stand2
+			else
+				self.ChangeSchedule( slSoldierFidget2 ); //soldier_move_stand3
+
+			//soldierh_hyper_laser_sound_end(self);
+		}
+		else
+		{
+			if( GetAnim(ANIM_FIDGET1) or Math.RandomFloat(0.0, 1.0) < 0.8 )
+				self.ChangeSchedule( self.GetScheduleOfType(SCHED_IDLE_STAND) ); //soldier_move_stand1
+			else
+				self.ChangeSchedule( slSoldierFidget2 ); //soldier_move_stand3
 		}
 	}
 
 	//blaster and shotgun
 	bool CheckRangeAttack1( float flDot, float flDist )
 	{
-		if( pev.weapons != WEAPON_MGUN and M_CheckAttack(flDist) ) //flDist > 64 and flDist <= 784 and flDot >= 0.5
+		if( !IsMGSoldier() and M_CheckAttack(flDist) ) //flDist > 64 and flDist <= 784 and flDot >= 0.5
 			return true;
 
 		return false;
@@ -349,7 +382,7 @@ final class npc_q2soldier : CBaseQ2NPC
 	//machinegun
 	bool CheckRangeAttack2( float flDot, float flDist )
 	{
-		if( pev.weapons == WEAPON_MGUN and M_CheckAttack(flDist) ) //flDist > 64 and flDist <= 512 and flDot >= 0.5
+		if( IsMGSoldier() and M_CheckAttack(flDist) ) //flDist > 64 and flDist <= 512 and flDot >= 0.5
 		{
 			m_flStopShooting = 0.0;
 
@@ -377,7 +410,7 @@ final class npc_q2soldier : CBaseQ2NPC
 			vecAim = (vecEnemyOrigin - vecMuzzle).Normalize();
 		}
 
-		if( pev.weapons == WEAPON_SHOTGUN )
+		if( IsShotgunSoldier() )
 		{
 			g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_SHOTGUN], VOL_NORM, ATTN_NORM );
 			GetSoundEntInstance().InsertSound( bits_SOUND_COMBAT, pev.origin, 384, 0.3, self );
@@ -386,7 +419,7 @@ final class npc_q2soldier : CBaseQ2NPC
 			MachineGunEffects( vecMuzzle );
 			monster_fire_weapon( q2npc::WEAPON_SHOTGUN, vecMuzzle, vecAim, SHOTGUN_DAMAGE );
 		}
-		else if( pev.weapons == WEAPON_MGUN )
+		else if( IsMGSoldier() )
 		{
 			if( m_flStopShooting <= 0.0 )
 				m_flStopShooting = g_Engine.time + Math.RandomFloat( 0.3, 1.1 );
@@ -443,6 +476,8 @@ final class npc_q2soldier : CBaseQ2NPC
 		if( pev.deadflag == DEAD_NO )
 			HandlePain( flDamage );
 
+		M_ReactToDamage( g_EntityFuncs.Instance(pevAttacker) );
+
 		return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
 	}
 
@@ -458,9 +493,9 @@ final class npc_q2soldier : CBaseQ2NPC
 
 		m_flPainDebounceTime = g_Engine.time + 3.0;
 
-		if( pev.weapons == WEAPON_SHOTGUN )
+		if( IsMGSoldier() )
 			g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_PAIN3], VOL_NORM, ATTN_NORM );
-		else if( pev.weapons == WEAPON_MGUN )
+		else if( IsMGSoldier() )
 			g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_PAIN1], VOL_NORM, ATTN_NORM );
 		else
 			g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_PAIN2], VOL_NORM, ATTN_NORM );
@@ -490,9 +525,9 @@ final class npc_q2soldier : CBaseQ2NPC
 		{
 			case TASK_DIE:
 			{
-				if( pev.weapons == WEAPON_SHOTGUN )
+				if( IsShotgunSoldier() )
 					g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_DEATH1], VOL_NORM, ATTN_NORM );
-				else if( pev.weapons == WEAPON_MGUN )
+				else if( IsMGSoldier() )
 					g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_DEATH3], VOL_NORM, ATTN_NORM );
 				else
 					g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_DEATH2], VOL_NORM, ATTN_NORM );
@@ -548,13 +583,13 @@ final class npc_q2soldier : CBaseQ2NPC
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_DEATH_GIB], VOL_NORM, ATTN_NORM );
 
-		ThrowGib( 3, MODEL_GIB_MEAT, pev.dmg, -1, BREAK_FLESH );
-		ThrowGib( 1, MODEL_GIB_BONE, pev.dmg, -1, BREAK_FLESH );
-		ThrowGib( 1, MODEL_GIB_BONE2, pev.dmg, -1, BREAK_FLESH );
-		ThrowGib( 1, MODEL_GIB_ARM, pev.dmg, 7, BREAK_FLESH, pev.skin / 2 ); //divide by 2 to get the proper gibskin, since the monster model has 6 skins but the gibs only have 3
-		ThrowGib( 1, MODEL_GIB_GUN, pev.dmg, 5, 0, pev.skin / 2 );
-		ThrowGib( 1, MODEL_GIB_CHEST, pev.dmg, 2, BREAK_FLESH, pev.skin / 2 );
-		ThrowGib( 1, MODEL_GIB_HEAD, pev.dmg, 3, BREAK_FLESH, pev.skin / 2 );
+		q2::ThrowGib( self, 3, MODEL_GIB_MEAT, pev.dmg, -1, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_BONE, pev.dmg, -1, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_BONE2, pev.dmg, -1, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_ARM, pev.dmg, 7, BREAK_FLESH, pev.skin / 2 ); //divide by 2 to get the proper gibskin, since the monster model has 6 skins but the gibs only have 3
+		q2::ThrowGib( self, 1, MODEL_GIB_GUN, pev.dmg, 5, 0, pev.skin / 2 );
+		q2::ThrowGib( self, 1, MODEL_GIB_CHEST, pev.dmg, 2, BREAK_FLESH, pev.skin / 2 );
+		q2::ThrowGib( self, 1, MODEL_GIB_HEAD, pev.dmg, 3, BREAK_FLESH, pev.skin / 2 );
 
 		SetThink( ThinkFunction(this.SUB_Remove) );
 		pev.nextthink = g_Engine.time;
@@ -576,11 +611,41 @@ final class npc_q2soldier : CBaseQ2NPC
 
 array<ScriptSchedule@>@ soldier_schedules;
 
+ScriptSchedule slSoldierFidget1
+(
+	bits_COND_NEW_ENEMY		|
+	bits_COND_SEE_FEAR			|
+	bits_COND_LIGHT_DAMAGE	|
+	bits_COND_HEAVY_DAMAGE	|
+	bits_COND_PROVOKED,
+	0,
+	"Soldier Idle Fidgeting1"
+);
+
+ScriptSchedule slSoldierFidget2
+(
+	bits_COND_NEW_ENEMY		|
+	bits_COND_SEE_FEAR			|
+	bits_COND_LIGHT_DAMAGE	|
+	bits_COND_HEAVY_DAMAGE	|
+	bits_COND_PROVOKED,
+	0,
+	"Soldier Idle Fidgeting2"
+);
+
 void InitSchedules()
 {
 	InitQ2BaseSchedules();
 
-	array<ScriptSchedule@> scheds = { slQ2Pain1, slQ2Pain2, slQ2Pain3 };
+	slSoldierFidget1.AddTask( ScriptTask(TASK_STOP_MOVING) );
+	slSoldierFidget1.AddTask( ScriptTask(TASK_PLAY_SEQUENCE, float(ACT_COMBAT_IDLE)) );
+	slSoldierFidget1.AddTask( ScriptTask(TASK_SET_ACTIVITY, float(ACT_IDLE)) );
+
+	slSoldierFidget2.AddTask( ScriptTask(TASK_STOP_MOVING) );
+	slSoldierFidget2.AddTask( ScriptTask(TASK_PLAY_SEQUENCE, float(ACT_TWITCH)) );
+	slSoldierFidget2.AddTask( ScriptTask(TASK_SET_ACTIVITY, float(ACT_IDLE)) );
+
+	array<ScriptSchedule@> scheds = { slQ2Pain1, slQ2Pain2, slQ2Pain3, slSoldierFidget1, slSoldierFidget2 };
 
 	@soldier_schedules = @scheds;
 }
@@ -591,7 +656,9 @@ void Register()
 
 	q2projectiles::RegisterProjectile( "laser" );
 
-	g_CustomEntityFuncs.RegisterCustomEntity( "npc_q2soldier::npc_q2soldier", "npc_q2soldier" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "npc_q2soldier::npc_q2soldier", NPC_NAME_BLASTER );
+	g_CustomEntityFuncs.RegisterCustomEntity( "npc_q2soldier::npc_q2soldier", NPC_NAME_SHOTGUN );
+	g_CustomEntityFuncs.RegisterCustomEntity( "npc_q2soldier::npc_q2soldier", NPC_NAME_MG );
 	g_Game.PrecacheOther( "npc_q2soldier" );
 }
 

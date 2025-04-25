@@ -50,6 +50,7 @@ class weapon_q2blaster : CBaseQ2Weapon
 		Precache();
 		g_EntityFuncs.SetModel( self, MODEL_WORLD );
 		self.m_flCustomDmg = pev.dmg;
+		self.m_iClip = -1; //NEEDED for WeaponIdle to be called on weapons that don't use ammo
 
 		self.FallInit();
 	}
@@ -76,6 +77,7 @@ class weapon_q2blaster : CBaseQ2Weapon
 	bool GetItemInfo( ItemInfo& out info )
 	{
 		info.iMaxAmmo1	= -1;
+		info.iMaxAmmo2	= -1;
 		info.iMaxClip 			= WEAPON_NOCLIP;
 		info.iSlot				= q2weapons::BLASTER_SLOT - 1;
 		info.iPosition			= q2weapons::BLASTER_POSITION - 1;
@@ -114,7 +116,10 @@ class weapon_q2blaster : CBaseQ2Weapon
 
 	void PrimaryAttack()
 	{
-		m_pPlayer.m_iWeaponVolume = LOUD_GUN_VOLUME;
+		//Quake 2 monsters aren't alerted to gunshots ??
+		if( q2::arrsQuake2Maps.find(g_Engine.mapname) < 0 )
+			m_pPlayer.m_iWeaponVolume = LOUD_GUN_VOLUME;
+
 		m_pPlayer.m_iWeaponFlash = BRIGHT_GUN_FLASH;
 		m_pPlayer.pev.effects |= EF_MUZZLEFLASH;
 		m_pPlayer.SetAnimation( PLAYER_ATTACK1 );
@@ -122,7 +127,9 @@ class weapon_q2blaster : CBaseQ2Weapon
 		self.SendWeaponAnim( ANIM_SHOOT );
 
 		g_SoundSystem.EmitSound( m_pPlayer.edict(), CHAN_WEAPON, pQ2WSounds[SND_SHOOT], GetSilencedVolume(VOL_NORM), ATTN_NORM );
-		GetSoundEntInstance().InsertSound( bits_SOUND_COMBAT, pev.origin, int(386 * GetSilencedVolume(1.0)), 3.0, self );
+
+		//if( q2::arrsQuake2Maps.find(g_Engine.mapname) < 0 )
+			//GetSoundEntInstance().InsertSound( bits_SOUND_COMBAT, pev.origin, int(386 * GetSilencedVolume(1.0)), 3.0, self );
 
 		Math.MakeVectors( m_pPlayer.pev.v_angle + m_pPlayer.pev.punchangle );
 		Vector vecMuzzle = m_pPlayer.GetGunPosition() + g_Engine.v_right * 6 + g_Engine.v_up * -8;
@@ -155,7 +162,6 @@ class weapon_q2blaster : CBaseQ2Weapon
 		if( self.m_flTimeWeaponIdle > g_Engine.time )
 			return;
 
-		//this doesn't work for SOME FUCKING REASON :aRage:
 		if( m_iIdleState == 0 )
 		{
 			self.SendWeaponAnim( ANIM_IDLE1 );

@@ -1,7 +1,10 @@
 #include "npcs/q2npccommon"
 #include "npcs/q2npcentities"
+#include "npcs/q2/fire_funcs"
+#include "npcs/q2npcflying"
 
 #include "npcs/npc_q2soldier" //20-40 HP
+#include "npcs/npc_q2flyer" //50 HP
 #include "npcs/npc_q2enforcer" //100 HP
 #include "npcs/npc_q2parasite" //175 HP
 #include "npcs/npc_q2gunner" //175 HP
@@ -28,12 +31,24 @@ int g_iChaosMode;
 const Vector DEFAULT_BULLET_SPREAD = VECTOR_CONE_3DEGREES;
 const Vector DEFAULT_SHOTGUN_SPREAD = VECTOR_CONE_5DEGREES;
 
-const int SPAWNFLAG_TANK_COMMANDER_GUARDIAN = 8;
-const int SPAWNFLAG_TANK_COMMANDER_HEAT_SEEKING = 16;
+enum sflag_e
+{
+	SPAWNFLAG_MONSTER_AMBUSH = 1,
+	SPAWNFLAG_MONSTER_TRIGGER_SPAWN = 2/*,
+	SPAWNFLAG_MONSTER_DEAD = 65536,
+	SPAWNFLAG_MONSTER_SUPER_STEP = 131072,
+	SPAWNFLAG_MONSTER_NO_DROP = 262144,
+	SPAWNFLAG_MONSTER_SCENIC = 524288*/
+};
+
+const string KVN_MASS = "$i_q2mass";
 
 const array<string> g_arrsQ2Monsters =
 {
+	"npc_q2soldier_light",
 	"npc_q2soldier",
+	"npc_q2soldier_ss",
+	"npc_q2flyer",
 	"npc_q2enforcer",
 	"npc_q2parasite",
 	"npc_q2gunner",
@@ -45,6 +60,25 @@ const array<string> g_arrsQ2Monsters =
 	"npc_q2supertank",
 	"npc_q2jorg",
 	"npc_q2makron"
+};
+
+dictionary g_dicMonsterNames = 
+{
+	{ "npc_q2soldier_light", "a Light Soldier" },
+	{ "npc_q2soldier", "a Shotgun Soldier" },
+	{ "npc_q2soldier_ss", "a Machinegun Soldier" },
+	{ "npc_q2flyer", "a Flyer" },
+	{ "npc_q2enforcer", "an Enforcer" },
+	{ "npc_q2parasite", "a Parasite" },
+	{ "npc_q2gunner", "a Gunner" },
+	{ "npc_q2ironmaiden", "an Iron Maiden" },
+	{ "npc_q2berserker", "a Berserker" },
+	{ "npc_q2gladiator", "a Gladiator" },
+	{ "npc_q2tank", "a Tank" },
+	{ "npc_q2tankc", "a Tank Commander" },
+	{ "npc_q2supertank", "a Super Tank" },
+	{ "npc_q2jorg", "Jorg" },
+	{ "npc_q2makron", "Makron" }
 };
 
 const array<string> g_arrsQ2Projectiles =
@@ -63,18 +97,22 @@ enum animev_e
 	AE_FLINCHRESET //HACK
 };
 
+/*
+	No pain animations in nightmare
+	Not much else at the moment
+*/
 enum diff_e
 {
 	DIFF_EASY = 0,
-	DIFF_MEDIUM,
+	DIFF_NORMAL,
 	DIFF_HARD,
 	DIFF_NIGHTMARE
 };
 
 /*
-0 = npc weapons are normal
-1 = npc weapons are randomly decided at spawn
-2 = npc weapons are random on every shot
+	0 = npc weapons are normal
+	1 = npc weapons are randomly decided at spawn
+	2 = npc weapons are random on every shot
 */
 enum chaos_e
 {
@@ -104,10 +142,6 @@ enum parmor_e
 
 void InitializeNPCS()
 {
-	g_bRerelease = true;
-	g_iChaosMode = CHAOS_NONE;
-	g_iDifficulty = DIFF_NIGHTMARE;
-
 	//for gibs
 	g_SoundSystem.PrecacheSound( "debris/flesh1.wav" );
 	g_SoundSystem.PrecacheSound( "debris/flesh2.wav" );
@@ -117,6 +151,7 @@ void InitializeNPCS()
 	g_SoundSystem.PrecacheSound( "debris/flesh7.wav" );
 
 	npc_q2soldier::Register();
+	npc_q2flyer::Register();
 	npc_q2enforcer::Register();
 	npc_q2parasite::Register();
 	npc_q2gunner::Register();
@@ -133,10 +168,10 @@ void InitializeNPCS()
 	g_CustomEntityFuncs.RegisterCustomEntity( "game_monstercounter", "game_monstercounter" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "trigger_random_position", "trigger_random_position" );
 
-	g_Hooks.RegisterHook( Hooks::Player::PlayerTakeDamage, @q2npc::PlayerTakeDamage );
+	//g_Hooks.RegisterHook( Hooks::Player::PlayerTakeDamage, @q2npc::PlayerTakeDamage );
 }
 
-HookReturnCode PlayerTakeDamage( DamageInfo@ pDamageInfo )
+/*HookReturnCode PlayerTakeDamage( DamageInfo@ pDamageInfo )
 {
 	if( pDamageInfo.bitsDamageType & (DMG_BURN | DMG_ACID) != 0 and pDamageInfo.pInflictor.pev.classname == "trigger_hurt" )
 		return HOOK_CONTINUE;
@@ -149,81 +184,52 @@ HookReturnCode PlayerTakeDamage( DamageInfo@ pDamageInfo )
 
 		if( pVictim.IsAlive() and pDamageInfo.flDamage >= pVictim.pev.health )
 		{
-			if( ((pDamageInfo.bitsDamageType & DMG_NEVERGIB) == 0 and pVictim.pev.health < -30) or (pDamageInfo.bitsDamageType & DMG_ALWAYSGIB) != 0 ) 
+			KillPlayer( pVictim, pDamageInfo.bitsDamageType );
+
+			string sDeathMsg, sModeOfDeath, sMonsterName;
+			g_dicMonsterNames.get( pProjectile.pev.netname, sMonsterName );
+
+			CustomKeyvalues@ pCustom = pVictim.GetCustomKeyvalues();
+
+			switch( pCustom.GetKeyvalue(q2::KVN_MOD).GetInteger() )
 			{
-				pVictim.GibMonster();
-				pVictim.pev.effects |= EF_NODRAW;
+				case q2::MOD_ROCKET:
+				{
+					sDeathMsg = string(pVictim.pev.netname) + " ate " + sMonsterName + "'s rocket.\n";
+					break;
+				}
+
+				case q2::MOD_R_SPLASH:
+				{
+					sDeathMsg = string(pVictim.pev.netname) + " almost dodged " + sMonsterName + "'s rocket.\n";
+					break;
+				}
+
+				default:
+				{
+					sDeathMsg = string(pVictim.pev.netname) + "died.\n";
+					break;
+				}
 			}
-
-			pVictim.Killed( null, GIB_NOPENALTY );
-			pVictim.m_iDeaths++;
-
-			string sDeathMsg;
-
+/*
 			if( pProjectile.GetClassname() == "q2laser" )
 			{
-				if( pProjectile.pev.targetname == "npc_q2soldier" )
-					sDeathMsg = string(pVictim.pev.netname) + " was blasted by a Light Guard\n";
-				else if( pProjectile.pev.targetname == "npc_q2tank" )
-					sDeathMsg = string(pVictim.pev.netname) + " was blasted by a Tank\n";
-				else if( pProjectile.pev.targetname == "npc_q2tankc" )
-					sDeathMsg = string(pVictim.pev.netname) + " was blasted by a Tank Commander\n";
-				else if( pProjectile.pev.targetname == "npc_q2makron" )
-					sDeathMsg = string(pVictim.pev.netname) + " was blasted by Makron\n";
+				if( pProjectile.pev.netname == "target_blaster" )
+					sDeathMsg = string(pVictim.pev.netname) + " got blasted\n";
 				else
-					return HOOK_CONTINUE;
+					sDeathMsg = string(pVictim.pev.netname) + " was blasted by " + sMonsterName + "\n";
 			}
 			else if( pProjectile.GetClassname() == "q2rocket" )
 			{
-				if( pProjectile.pev.targetname == "npc_q2ironmaiden" )
-				{
-					if( Math.RandomLong(1, 10) <= 5 )
-						sDeathMsg = string(pVictim.pev.netname) + "  almost dodged an Iron Maiden's rocket\n";
-					else
-						sDeathMsg = string(pVictim.pev.netname) + " ate an Iron Maiden's rocket\n";
-				}
-				else if( pProjectile.pev.targetname == "npc_q2tank" )
-				{
-					if( Math.RandomLong(1, 10) <= 5 )
-						sDeathMsg = string(pVictim.pev.netname) + " almost dodged a Tank's rocket\n";
-					else
-						sDeathMsg = string(pVictim.pev.netname) + " ate a Tank's rocket\n";
-				}
-				else if( pProjectile.pev.targetname == "npc_q2tankc" )
-				{
-					if( Math.RandomLong(1, 10) <= 5 )
-						sDeathMsg = string(pVictim.pev.netname) + " almost dodged a Tank Commander's rocket\n";
-					else
-						sDeathMsg = string(pVictim.pev.netname) + " ate a Tank Commander's rocket\n";
-				}
-				else if( pProjectile.pev.targetname == "npc_q2supertank" )
-				{
-					if( Math.RandomLong(1, 10) <= 5 )
-						sDeathMsg = string(pVictim.pev.netname) + " almost dodged a Super Tank's rocket\n";
-					else
-						sDeathMsg = string(pVictim.pev.netname) + " ate a Super Tank's rocket\n";
-				}
+				if( Math.RandomLong(1, 10) <= 5 )
+					sDeathMsg = string(pVictim.pev.netname) + " almost dodged " + sMonsterName + "'s rocket\n";
 				else
-					return HOOK_CONTINUE;
+					sDeathMsg = string(pVictim.pev.netname) + " ate " + sMonsterName + "'s rocket\n";
 			}
 			else if( pProjectile.GetClassname() == "q2grenade" )
-			{
-				if( pProjectile.pev.targetname == "npc_q2supertank" )
-					sDeathMsg = string(pVictim.pev.netname) + " was popped by a Super Tank's grenade\n";
-				else if( pProjectile.pev.targetname == "npc_q2gunner" )
-					sDeathMsg = string(pVictim.pev.netname) + " was popped by a Gunner's grenade\n";
-				else
-					return HOOK_CONTINUE;
-			}
+				sDeathMsg = string(pVictim.pev.netname) + " was popped by " + sMonsterName + "'s grenade\n";
 			else if( pProjectile.GetClassname() == "q2bfg" )
-			{
-				if( pProjectile.pev.targetname == "npc_q2jorg" )
-					sDeathMsg = string(pVictim.pev.netname) + " was disintegrated by Jorg's BFG\n";
-				else if( pProjectile.pev.targetname == "npc_q2makron" )
-					sDeathMsg = string(pVictim.pev.netname) + " was disintegrated by Makron's BFG\n";
-				else
-					return HOOK_CONTINUE;
-			}
+				sDeathMsg = string(pVictim.pev.netname) + " was disintegrated by " + sMonsterName + "'s BFG\n";
 			else
 				return HOOK_CONTINUE;
 
@@ -242,80 +248,40 @@ HookReturnCode PlayerTakeDamage( DamageInfo@ pDamageInfo )
 
 		if( pVictim.IsAlive() and pDamageInfo.flDamage >= pVictim.pev.health )
 		{
-			if( ((pDamageInfo.bitsDamageType & DMG_NEVERGIB) == 0 and pVictim.pev.health < -30) or (pDamageInfo.bitsDamageType & DMG_ALWAYSGIB) != 0 ) 
+			KillPlayer( pVictim, pDamageInfo.bitsDamageType );
+
+			string sDeathMsg, sMonsterName;
+			g_dicMonsterNames.get( pDamageInfo.pAttacker.GetClassname(), sMonsterName );
+
+			if( pDamageInfo.bitsDamageType & (DMG_ALWAYSGIB + DMG_CRUSH) == (DMG_ALWAYSGIB + DMG_CRUSH) )
+				sDeathMsg = string(pVictim.pev.netname) + " tried to invade " + sMonsterName + "'s personal space.\n";
+			else if( HasFlags(pDamageInfo.bitsDamageType, DMG_ENERGYBEAM) )
+				sDeathMsg = string(pVictim.pev.netname) + " was railed by " + sMonsterName + "\n";
+			else if( HasFlags(pDamageInfo.bitsDamageType, DMG_BULLET) )
 			{
-				pVictim.GibMonster();
-				pVictim.pev.effects |= EF_NODRAW;
-			}
-
-			pVictim.Killed( null, GIB_NOPENALTY );
-			pVictim.m_iDeaths++;
-
-			string sDeathMsg;
-
-			if( pDamageInfo.pAttacker.GetClassname() == "npc_q2soldier" )
-			{
-				if( pDamageInfo.pAttacker.pev.weapons == 1 )
-					sDeathMsg = string(pVictim.pev.netname) + " was gunned down by a Shotgun Guard\n";
+				if( pDamageInfo.pAttacker.GetClassname() == "npc_q2soldier" )
+					sDeathMsg = string(pVictim.pev.netname) + " was gunned down by a Shotgun Soldier\n";
+				else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2soldier_ss" )
+					sDeathMsg = string(pVictim.pev.netname) + " was machinegunned by a Machinegun Soldier\n";
+				else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2gunner" )
+					sDeathMsg = string(pVictim.pev.netname) + " was machinegunned by a Gunner\n";
 				else
-					sDeathMsg = string(pVictim.pev.netname) + " was machine-gunned by a Machinegun Guard\n";
+					sDeathMsg = string(pVictim.pev.netname) + " was pumped full of lead by " + sMonsterName + "\n";
 			}
-			else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2enforcer" )
+			else
 			{
-				if( (pDamageInfo.bitsDamageType & DMG_BULLET) != 0 )
-					sDeathMsg = string(pVictim.pev.netname) + " was pumped full of lead by an Enforcer\n";
-				else
+				if( pDamageInfo.pAttacker.GetClassname() == "npc_q2flyer" )
+					sDeathMsg = string(pVictim.pev.netname) + " was cut up by a Flyer's sharp wings\n";
+				else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2enforcer" )
 					sDeathMsg = string(pVictim.pev.netname) + " was bludgeoned by an Enforcer\n";
-			}
-			else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2parasite" )
-				sDeathMsg = string(pVictim.pev.netname) + " was exsanguinated by a Parasite\n";
-			else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2gunner" )
-				sDeathMsg = string(pVictim.pev.netname) + " was machinegunned by a Gunner\n";
-			else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2ironmaiden" )
-				sDeathMsg = string(pVictim.pev.netname) + " was bitch-slapped by an Iron Maiden\n";
-			else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2berserker" )
-				sDeathMsg = string(pVictim.pev.netname) + " was smashed by a Berserker\n";
-			else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2gladiator" )
-			{
-				if( (pDamageInfo.bitsDamageType & DMG_ENERGYBEAM) != 0 )
-					sDeathMsg = string(pVictim.pev.netname) + " was railed by a Gladiator\n";
-				else
+				else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2parasite" )
+					sDeathMsg = string(pVictim.pev.netname) + " was exsanguinated by a Parasite\n";
+				else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2ironmaiden" )
+					sDeathMsg = string(pVictim.pev.netname) + " was bitch-slapped by an Iron Maiden\n";
+				else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2berserker" )
+					sDeathMsg = string(pVictim.pev.netname) + " was smashed by a Berserker\n";
+				else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2gladiator" )
 					sDeathMsg = string(pVictim.pev.netname) + " was mangled by a Gladiator's claw\n";
-			}
-			else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2tank" )
-			{
-				if( (pDamageInfo.bitsDamageType & DMG_BULLET) != 0 )
-					sDeathMsg = string(pVictim.pev.netname) + " was pumped full of lead by a Tank\n";
-				else
-					return HOOK_CONTINUE;
-			}
-			else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2tankc" )
-			{
-				if( (pDamageInfo.bitsDamageType & DMG_BULLET) != 0 )
-					sDeathMsg = string(pVictim.pev.netname) + " was pumped full of lead by a Tank Commander\n";
-				else
-					return HOOK_CONTINUE;
-			}
-			else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2supertank" )
-			{
-				if( (pDamageInfo.bitsDamageType & DMG_BULLET) != 0 )
-					sDeathMsg = string(pVictim.pev.netname) + " was pumped full of lead by a Super Tank\n";
-				else
-					return HOOK_CONTINUE;
-			}
-			else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2jorg" )
-			{
-				if( (pDamageInfo.bitsDamageType & DMG_BULLET) != 0 )
-					sDeathMsg = string(pVictim.pev.netname) + " was pumped full of lead by Jorg\n";
-				else
-					return HOOK_CONTINUE;
-			}
-			else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2makron" )
-			{
-				if( (pDamageInfo.bitsDamageType & DMG_ENERGYBEAM) != 0 )
-					sDeathMsg = string(pVictim.pev.netname) + " was railed by Makron\n";
-				else
-					return HOOK_CONTINUE;
 			}
 
 			g_PlayerFuncs.ClientPrintAll( HUD_PRINTNOTIFY, sDeathMsg );
@@ -323,7 +289,7 @@ HookReturnCode PlayerTakeDamage( DamageInfo@ pDamageInfo )
 	}
 
 	return HOOK_CONTINUE;
-}
+}*/
 
 //from quake 2 rerelease
 Vector slerp( const Vector &in vecFrom, const Vector &in vecTo, float t )
@@ -350,13 +316,30 @@ Vector slerp( const Vector &in vecFrom, const Vector &in vecTo, float t )
     return vecFrom * aFactor + vecTo * bFactor;
 }
 
+int GetMass( CBaseEntity@ pEntity )
+{
+	CustomKeyvalues@ pCustom = pEntity.GetCustomKeyvalues();
+	if( !pCustom.GetKeyvalue(q2npc::KVN_MASS).Exists() )
+		return 0;
+
+	return pCustom.GetKeyvalue( q2npc::KVN_MASS ).GetInteger();
+}
+
+bool HasFlags( int iFlagVariable, int iFlags )
+{
+	return (iFlagVariable & iFlags) != 0;
+}
+
 } //end of namespace q2npc
 
 /* FIXME
+	Try to fix flinching, the last frame loops for a few frames (also triggering animation events)
 */
 
 /* TODO
-	Try to fix flinching, the last frame loops for a few frames (also triggering animation events)
+	Change idle sounds so they can make use of SPAWNFLAG_MONSTER_AMBUSH
+
+	Add Trigger Spawn
 
 	Add blindfire ??
 
@@ -369,4 +352,8 @@ Vector slerp( const Vector &in vecFrom, const Vector &in vecTo, float t )
 	Update the size of the monsters to make sure they've been scaled properly ??
 
 	Separate the Strogg Guards into separate entities ??
+
+	Consolidate the CBaseQ2NPC and CBaseQ1Flying classes ??
+
+	Move the weapon and monster fire functions to one place ??
 */

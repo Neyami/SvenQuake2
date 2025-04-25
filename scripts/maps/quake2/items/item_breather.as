@@ -15,8 +15,8 @@ final class item_breather : ScriptBaseItemEntity, item_q2pickup
 {
 	item_breather()
 	{
-		m_iItemID = IT_ITEM_REBREATHER;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iItemID = q2::IT_ITEM_REBREATHER;
+		m_iWorldModelFlags = q2::EF_ROTATE;
 		m_sModel = MODEL_BREATHER;
 		m_sSound = "quake2/items/pkup.wav";
 		m_flRespawnTime = BREATHER_RESPAWN;
@@ -96,7 +96,7 @@ class weapon_q2breather : ScriptBasePlayerWeaponEntity
 		{
 			CustomKeyvalues@ pCustom = m_pPlayer.GetCustomKeyvalues();
 			HUDNumDisplayParams hudParams;
-			q2items::GetHudParams( m_pPlayer, q2items::IT_ITEM_REBREATHER, hudParams );
+			q2items::GetHudParams( m_pPlayer, q2::IT_ITEM_REBREATHER, hudParams );
 
 			float flDuration = BREATHER_DURATION;
 			if( pCustom.GetKeyvalue(BREATHER_KVN).GetInteger() >= 1 )
@@ -144,7 +144,7 @@ class weapon_q2breather : ScriptBasePlayerWeaponEntity
 
 void RunRebreather( CBasePlayer@ pPlayer )
 {
-	if( IsItemActive(pPlayer, IT_ITEM_REBREATHER) and !IsItemActive(pPlayer, IT_ITEM_ENVIROSUIT) )
+	if( IsItemActive(pPlayer, q2::IT_ITEM_REBREATHER) and !IsItemActive(pPlayer, q2::IT_ITEM_ENVIROSUIT) )
 	{
 		if( pPlayer.pev.waterlevel == WATERLEVEL_HEAD )
 		{

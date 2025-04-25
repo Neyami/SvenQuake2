@@ -95,15 +95,27 @@ enum anim_e
 	ANIM_ATTACK_BFG
 };
 
-const int SF_JORG_NORIDER = 1024;
-
 final class npc_q2jorg : CBaseQ2NPC
 {
 	private int m_iDeathExplosions;
 	private int m_iTriggerCondition;
 	private string m_sTriggerTarget;
+	private bool m_bNoRider;
 
-	void Spawn()
+	bool MonsterKeyValue( const string& in szKey, const string& in szValue )
+	{
+		if( szKey == "norider" )
+		{
+			if( atoi(szValue) >= 1 )
+				m_bNoRider = true;
+
+			return true;
+		}
+
+		return false;
+	}
+
+	void MonsterSpawn()
 	{
 		AppendAnims();
 
@@ -112,7 +124,7 @@ final class npc_q2jorg : CBaseQ2NPC
 		g_EntityFuncs.SetModel( self, NPC_MODEL );
 		g_EntityFuncs.SetSize( self.pev, NPC_MINS, NPC_MAXS );
 
-		if( (pev.weapons & SF_JORG_NORIDER) != 0 )
+		if( m_bNoRider )
 			pev.body = 1;
 
 		if( pev.health <= 0 )
@@ -133,15 +145,11 @@ final class npc_q2jorg : CBaseQ2NPC
 			self.m_FormattedName	= "Jorg";
 
 		m_flGibHealth = -2000.0;
-
-		CommonSpawn();
+		SetMass( 1000 );
 
 		@this.m_Schedules = @jorg_schedules;
 
 		self.MonsterInit();
-
-		if( self.IsPlayerAlly() )
-			SetUse( UseFunction(this.FollowerUse) );
 
 		if( self.m_iTriggerCondition == 4 )
 		{
@@ -175,11 +183,6 @@ final class npc_q2jorg : CBaseQ2NPC
 
 		for( uint i = 0; i < arrsNPCSounds.length(); ++i )
 			g_SoundSystem.PrecacheSound( arrsNPCSounds[i] );
-	}
-
-	void FollowerUse( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
-	{
-		self.FollowerPlayerUse( pActivator, pCaller, useType, flValue );
 	}
 
 	void SetYawSpeed() //SUPER IMPORTANT, NPC WON'T DO ANYTHING WITHOUT THIS :aRage:
@@ -232,6 +235,12 @@ final class npc_q2jorg : CBaseQ2NPC
 
 	void RunAI()
 	{
+		if( m_flTriggeredSpawn > 0 )
+		{
+			m_flTriggeredSpawn = 0.0;
+			monster_triggered_spawn();
+		}
+
 		BaseClass.RunAI();
 
 		DoSearchSound();
@@ -312,7 +321,7 @@ final class npc_q2jorg : CBaseQ2NPC
 				//StopLoopingSounds();
 				//return BaseClass.GetScheduleOfType( SCHED_RANGE_ATTACK2 ); //bfg
 
-				if( (pev.weapons & SF_JORG_NORIDER) != 0 or Math.RandomFloat(0.0, 1.0) <= 0.75 )
+				if( m_bNoRider or Math.RandomFloat(0.0, 1.0) <= 0.75 )
 				{
 					StopLoopingSounds();
 					g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_ATK_GUN_START], VOL_NORM, ATTN_NORM );
@@ -335,7 +344,7 @@ final class npc_q2jorg : CBaseQ2NPC
 		{
 			case q2npc::AE_IDLESOUND:
 			{
-				if( !pev.SpawnFlagBitSet(SF_AMBUSH) )
+				if( !HasFlags(m_iSpawnFlags, q2npc::SPAWNFLAG_MONSTER_AMBUSH) )
 					g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_IDLE], VOL_NORM, ATTN_NORM );
 
 				break;
@@ -343,7 +352,7 @@ final class npc_q2jorg : CBaseQ2NPC
 
 			case AE_STEP_LEFT:
 			{
-				if( !pev.SpawnFlagBitSet(SF_AMBUSH) )
+				if( !HasFlags(m_iSpawnFlags, q2npc::SPAWNFLAG_MONSTER_AMBUSH) )
 					jorg_step_left();
 
 				break;
@@ -351,7 +360,7 @@ final class npc_q2jorg : CBaseQ2NPC
 
 			case AE_STEP_RIGHT:
 			{
-				if( !pev.SpawnFlagBitSet(SF_AMBUSH) )
+				if( !HasFlags(m_iSpawnFlags, q2npc::SPAWNFLAG_MONSTER_AMBUSH) )
 					jorg_step_right();
 
 				break;
@@ -543,6 +552,8 @@ final class npc_q2jorg : CBaseQ2NPC
 		bitsDamageType &= ~DMG_ALWAYSGIB;
 		bitsDamageType |= DMG_NEVERGIB;
 
+		M_ReactToDamage( g_EntityFuncs.Instance(pevAttacker) );
+
 		return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
 	}
 
@@ -613,10 +624,9 @@ final class npc_q2jorg : CBaseQ2NPC
 
 	bool ShouldGibMonster( int iGib ) { return false; }
 
-	void Killed( entvars_t@ pevAttacker, int iGib )
+	void MonsterKilled( entvars_t@ pevAttacker, int iGib )
 	{
 		StopLoopingSounds();
-		BaseClass.Killed( pevAttacker, GIB_NEVER );
 	}
 
 	void BossExplodeOriginal()
@@ -737,27 +747,27 @@ final class npc_q2jorg : CBaseQ2NPC
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_DEATH_GIB], VOL_NORM, ATTN_NORM );
 
-		ThrowGib( 2, MODEL_GIB_MEAT, 500, -1, BREAK_FLESH );
-		ThrowGib( 2, MODEL_GIB_METAL, 500, -1, BREAK_METAL );
-		ThrowGib( 1, MODEL_GIB_CHEST, 500, 2, BREAK_FLESH );
-		ThrowGib( 1, MODEL_GIB_FOOT, 500, 30, BREAK_METAL );
-		ThrowGib( 1, MODEL_GIB_FOOT, 500, 31, BREAK_METAL );
-		ThrowGib( 1, MODEL_GIB_GUN, 500, 10, BREAK_METAL );
-		ThrowGib( 1, MODEL_GIB_GUN, 500, 19, BREAK_METAL );
-		ThrowGib( 1, MODEL_GIB_HEAD, 500, 3, BREAK_FLESH );
+		q2::ThrowGib( self, 2, MODEL_GIB_MEAT, 500, -1, BREAK_FLESH );
+		q2::ThrowGib( self, 2, MODEL_GIB_METAL, 500, -1, BREAK_METAL );
+		q2::ThrowGib( self, 1, MODEL_GIB_CHEST, 500, 2, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_FOOT, 500, 30, BREAK_METAL );
+		q2::ThrowGib( self, 1, MODEL_GIB_FOOT, 500, 31, BREAK_METAL );
+		q2::ThrowGib( self, 1, MODEL_GIB_GUN, 500, 10, BREAK_METAL );
+		q2::ThrowGib( self, 1, MODEL_GIB_GUN, 500, 19, BREAK_METAL );
+		q2::ThrowGib( self, 1, MODEL_GIB_HEAD, 500, 3, BREAK_FLESH );
 
 		for( uint i = 0; i < 6; i++ )
 		{
 			if( i <= 2 )
-				ThrowGib( 1, MODEL_GIB_SPIKE, 500, 4+i, BREAK_METAL );
+				q2::ThrowGib( self, 1, MODEL_GIB_SPIKE, 500, 4+i, BREAK_METAL );
 			else if( i > 2 )
-				ThrowGib( 1, MODEL_GIB_SPIKE, 500, 10+i, BREAK_METAL );
+				q2::ThrowGib( self, 1, MODEL_GIB_SPIKE, 500, 10+i, BREAK_METAL );
 		}
 
-		ThrowGib( 1, MODEL_GIB_SPINE, 500, 22, BREAK_FLESH );
-		ThrowGib( 1, MODEL_GIB_THIGH, 500, 23, BREAK_METAL );
-		ThrowGib( 1, MODEL_GIB_THIGH, 500, 27, BREAK_METAL );
-		ThrowGib( 4, MODEL_GIB_TUBE, 500, -1 );
+		q2::ThrowGib( self, 1, MODEL_GIB_SPINE, 500, 22, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_THIGH, 500, 23, BREAK_METAL );
+		q2::ThrowGib( self, 1, MODEL_GIB_THIGH, 500, 27, BREAK_METAL );
+		q2::ThrowGib( self, 4, MODEL_GIB_TUBE, 500, -1 );
 
 		Explosion( pev.origin, 90 );
 
@@ -767,7 +777,7 @@ final class npc_q2jorg : CBaseQ2NPC
 
 	void MakronSpawn()
 	{
-		if( (pev.weapons & SF_JORG_NORIDER) != 0 )
+		if( m_bNoRider )
 			return;
 
 		CBaseEntity@ pMakronCBE = g_EntityFuncs.Create( "npc_q2makron", pev.origin + Vector(0, 0, 10), pev.angles, false );
@@ -781,7 +791,7 @@ final class npc_q2jorg : CBaseQ2NPC
 				g_EntityFuncs.DispatchKeyValue( pMakron.edict(), "TriggerTarget", m_sTriggerTarget );
 			}
 
-			pMakron.pev.weapons = 4269;
+			pMakron.pev.team = 4269;
 
 			g_EntityFuncs.DispatchSpawn( pMakron.edict() );
 

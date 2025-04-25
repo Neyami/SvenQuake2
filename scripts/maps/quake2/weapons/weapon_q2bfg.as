@@ -146,7 +146,9 @@ class weapon_q2bfg : CBaseQ2Weapon
 		self.SendWeaponAnim( ANIM_SHOOT );
 
 		g_SoundSystem.EmitSound( m_pPlayer.edict(), CHAN_WEAPON, pQ2WSounds[SND_SHOOT], GetSilencedVolume(VOL_NORM), ATTN_NORM );
-		GetSoundEntInstance().InsertSound( bits_SOUND_COMBAT, pev.origin, int(386 * GetSilencedVolume(1.0)), 3.0, self );
+
+		//if( q2::arrsQuake2Maps.find(g_Engine.mapname) < 0 )
+			//GetSoundEntInstance().InsertSound( bits_SOUND_COMBAT, pev.origin, int(386 * GetSilencedVolume(1.0)), 3.0, self );
 
 		m_flBFG = g_Engine.time + 0.8;
 
@@ -177,8 +179,7 @@ class weapon_q2bfg : CBaseQ2Weapon
 		{
 			m_flBFG = 0.0;
 
-			int ammo = m_pPlayer.m_rgAmmo( self.m_iPrimaryAmmoType );
-			if( ammo < Q2W_AMMO_PER_SHOT )
+			if( m_pPlayer.m_rgAmmo(self.m_iPrimaryAmmoType) < Q2W_AMMO_PER_SHOT )
 			{
 				self.PlayEmptySound();
 				self.SendWeaponAnim( ANIM_IDLE );
@@ -188,8 +189,7 @@ class weapon_q2bfg : CBaseQ2Weapon
 				return;
 			}
 
-			ammo -= Q2W_AMMO_PER_SHOT;
-			m_pPlayer.m_rgAmmo( self.m_iPrimaryAmmoType, ammo );
+			G_RemoveAmmo( Q2W_AMMO_PER_SHOT );
 			q2::G_CheckPowerArmor( m_pPlayer );
 
 			float flDamage = Q2W_DAMAGE;
@@ -203,7 +203,10 @@ class weapon_q2bfg : CBaseQ2Weapon
 			}
 
 			m_pPlayer.SetAnimation( PLAYER_ATTACK1 );
-			m_pPlayer.m_iWeaponVolume = LOUD_GUN_VOLUME;
+
+			//Quake 2 monsters aren't alerted to gunshots ??
+			if( q2::arrsQuake2Maps.find(g_Engine.mapname) < 0 )
+				m_pPlayer.m_iWeaponVolume = LOUD_GUN_VOLUME;
 
 			Math.MakeVectors( m_pPlayer.pev.v_angle + m_pPlayer.pev.punchangle );
 			Vector vecMuzzle = m_pPlayer.GetGunPosition() + g_Engine.v_right * 3 + g_Engine.v_up * -10;
@@ -212,7 +215,7 @@ class weapon_q2bfg : CBaseQ2Weapon
 			fire_bfg( vecMuzzle, vecAim, Q2W_DAMAGE, Q2W_SPEED, Q2W_RADIUS );
 
 			m_pPlayer.pev.punchangle.x = Q2W_RECOIL;
-			m_pPlayer.pev.punchangle.z = crandom_open() * 8;
+			m_pPlayer.pev.punchangle.z = q2::crandom() * 8;
 
 			CheckSilencer();
 		}

@@ -75,7 +75,7 @@ final class npc_q2gladiator : CBaseQ2NPC
 {
 	private Vector m_vecEnemyDir;
 
-	void Spawn()
+	void MonsterSpawn()
 	{
 		AppendAnims();
 
@@ -97,15 +97,11 @@ final class npc_q2gladiator : CBaseQ2NPC
 			self.m_FormattedName	= "Gladiator";
 
 		m_flGibHealth = -175.0;
-
-		CommonSpawn();
+		SetMass( 400 );
 
 		@this.m_Schedules = @gladiator_schedules;
 
 		self.MonsterInit();
-
-		if( self.IsPlayerAlly() )
-			SetUse( UseFunction(this.FollowerUse) );
 	}
 
 	void AppendAnims()
@@ -131,11 +127,6 @@ final class npc_q2gladiator : CBaseQ2NPC
 			g_SoundSystem.PrecacheSound( arrsNPCSounds[i] );
 	}
 
-	void FollowerUse( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
-	{
-		self.FollowerPlayerUse( pActivator, pCaller, useType, flValue );
-	}
-
 	void SetYawSpeed() //SUPER IMPORTANT, NPC WON'T DO ANYTHING WITHOUT THIS :aRage:
 	{
 		int ys = 120;
@@ -150,12 +141,12 @@ final class npc_q2gladiator : CBaseQ2NPC
 		return CLASS_ALIEN_MILITARY;
 	}
 
-	void IdleSoundQ2()
+	void MonsterIdle()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_IDLE], VOL_NORM, ATTN_IDLE );
 	}
 
-	void AlertSound()
+	void MonsterAlertSound()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_SIGHT], VOL_NORM, ATTN_NORM );
 	}
@@ -292,6 +283,8 @@ final class npc_q2gladiator : CBaseQ2NPC
 		if( pev.deadflag == DEAD_NO )
 			HandlePain( flDamage );
 
+		M_ReactToDamage( g_EntityFuncs.Instance(pevAttacker) );
+
 		return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
 	}
 
@@ -323,14 +316,14 @@ final class npc_q2gladiator : CBaseQ2NPC
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_DEATH_GIB], VOL_NORM, ATTN_NORM );
 
-		ThrowGib( 2, MODEL_GIB_BONE, pev.dmg, -1 );
-		ThrowGib( 2, MODEL_GIB_MEAT, pev.dmg, -1, BREAK_FLESH );
-		ThrowGib( 1, MODEL_GIB_THIGH, pev.dmg, 3 );
-		ThrowGib( 1, MODEL_GIB_THIGH, pev.dmg, 14 );
-		ThrowGib( 1, MODEL_GIB_LARM, pev.dmg, 10 );
-		ThrowGib( 1, MODEL_GIB_RARM, pev.dmg, 8 );
-		ThrowGib( 1, MODEL_GIB_CHEST, pev.dmg, 5 );
-		ThrowGib( 1, MODEL_GIB_HEAD, pev.dmg, 6, BREAK_FLESH );
+		q2::ThrowGib( self, 2, MODEL_GIB_BONE, pev.dmg, -1 );
+		q2::ThrowGib( self, 2, MODEL_GIB_MEAT, pev.dmg, -1, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_THIGH, pev.dmg, 3 );
+		q2::ThrowGib( self, 1, MODEL_GIB_THIGH, pev.dmg, 14 );
+		q2::ThrowGib( self, 1, MODEL_GIB_LARM, pev.dmg, 10 );
+		q2::ThrowGib( self, 1, MODEL_GIB_RARM, pev.dmg, 8 );
+		q2::ThrowGib( self, 1, MODEL_GIB_CHEST, pev.dmg, 5 );
+		q2::ThrowGib( self, 1, MODEL_GIB_HEAD, pev.dmg, 6, BREAK_FLESH );
 
 		SetThink( ThinkFunction(this.SUB_Remove) );
 		pev.nextthink = g_Engine.time;

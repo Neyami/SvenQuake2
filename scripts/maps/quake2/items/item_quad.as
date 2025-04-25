@@ -14,8 +14,8 @@ final class item_quad : ScriptBaseItemEntity, item_q2pickup
 {
 	item_quad()
 	{
-		m_iItemID = IT_ITEM_QUAD;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iItemID = q2::IT_ITEM_QUAD;
+		m_iWorldModelFlags = q2::EF_ROTATE;
 		m_sModel = MODEL_QUAD;
 		m_sSound = "quake2/items/pkup.wav";
 		m_flRespawnTime = QUAD_RESPAWN;
@@ -95,7 +95,7 @@ class weapon_q2quad : ScriptBasePlayerWeaponEntity
 		{
 			CustomKeyvalues@ pCustom = m_pPlayer.GetCustomKeyvalues();
 			HUDNumDisplayParams hudParams;
-			q2items::GetHudParams( m_pPlayer, q2items::IT_ITEM_QUAD, hudParams );
+			q2items::GetHudParams( m_pPlayer, q2::IT_ITEM_QUAD, hudParams );
 
 			float flDuration = QUAD_DURATION;
 			if( pCustom.GetKeyvalue(QUAD_KVN).GetInteger() >= 1 )

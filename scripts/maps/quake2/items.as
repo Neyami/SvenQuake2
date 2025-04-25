@@ -1,4 +1,6 @@
 #include "enums"
+
+//Original
 #include "items/item_quad"
 #include "items/item_invulnerability"
 #include "items/item_silencer"
@@ -8,15 +10,20 @@
 #include "items/item_power_screen"
 #include "items/item_power_shield"
 
+//N64
+#include "items/item_invisibility"
+
+//Ground Zero
+
 namespace q2items
 {
 
 bool g_bRerelease;
 
-const int ITEM_LEVITATE_HEIGHT		= 36;
+const int ITEM_LEVITATE_HEIGHT		= 18;
 const int PLAYER_MAX_HEALTH			= 100;
 
-const int SF_NO_RESPAWN					= 1024;
+const int SF_NO_RESPAWN					= 4096;
 
 const string SOUND_RESPAWN			= "quake2/items/respawn1.wav";
 
@@ -64,6 +71,8 @@ const int SILENCER_SLOT					= 5;
 const int SILENCER_POSITION			= 19;
 const int ADRENALINE_SLOT				= 5;
 const int ADRENALINE_POSITION		= 20;
+const int INVIS_SLOT							= 5;
+const int INVIS_POSITION					= 21;
 
 const int SILENCER_HUD_CHANNEL		= 15;
 const int PARMOR_HUD_CHANNEL		= 14;
@@ -71,6 +80,7 @@ const int INVUL_HUD_CHANNEL			= 13;
 const int QUAD_HUD_CHANNEL			= 12;
 const int BREATHER_HUD_CHANNEL	= 11;
 const int ENVIRO_HUD_CHANNEL		= 10;
+const int INVIS_HUD_CHANNEL			= 9;
 
 //AMMO, AMMUNITION ITEMS
 class ammo_q2shells : ScriptBaseItemEntity, item_q2pickup
@@ -156,7 +166,7 @@ final class item_health_small : ScriptBaseItemEntity, item_q2pickup
 {
 	item_health_small()
 	{
-		m_iItemID = IT_HEALTH_SMALL;
+		m_iItemID = q2::IT_HEALTH_SMALL;
 		m_sModel = "models/quake2/items/healing/stimpack.mdl";
 		m_sSound = "quake2/items/s_health.wav";
 		m_iAmount = 2;
@@ -168,7 +178,7 @@ final class item_health : ScriptBaseItemEntity, item_q2pickup
 {
 	item_health()
 	{
-		m_iItemID = IT_HEALTH_MEDIUM;
+		m_iItemID = q2::IT_HEALTH_MEDIUM;
 		m_sModel = "models/quake2/items/healing/medium.mdl";
 		m_sSound = "quake2/items/n_health.wav";
 		m_iAmount = 10;
@@ -180,7 +190,7 @@ final class item_health_large : ScriptBaseItemEntity, item_q2pickup
 {
 	item_health_large()
 	{
-		m_iItemID = IT_HEALTH_LARGE;
+		m_iItemID = q2::IT_HEALTH_LARGE;
 		m_sModel = "models/quake2/items/healing/large.mdl";
 		m_sSound = "quake2/items/l_health.wav";
 		m_iAmount = 25;
@@ -192,7 +202,7 @@ final class item_health_mega : ScriptBaseItemEntity, item_q2pickup
 {
 	item_health_mega()
 	{
-		m_iItemID = IT_HEALTH_MEGA;
+		m_iItemID = q2::IT_HEALTH_MEGA;
 		m_sModel = "models/quake2/items/mega_h.mdl";
 		m_sSound = "quake2/items/m_health.wav";
 		m_iAmount = 100;
@@ -204,8 +214,8 @@ final class item_ancient_head : ScriptBaseItemEntity, item_q2pickup
 {
 	item_ancient_head()
 	{
-		m_iItemID = IT_ITEM_ANCIENT_HEAD;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iItemID = q2::IT_ITEM_ANCIENT_HEAD;
+		m_iWorldModelFlags = q2::EF_ROTATE;
 		m_sModel = "models/quake2/items/c_head.mdl";
 		m_sSound = "quake2/items/pkup.wav";
 		m_flRespawnTime = HEALTH_RESPAWN_TIME*2;
@@ -217,8 +227,9 @@ final class item_armor_shard : ScriptBaseItemEntity, item_q2pickup
 {
 	item_armor_shard()
 	{
-		m_iItemID = IT_ARMOR_SHARD;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iItemID = q2::IT_ARMOR_SHARD;
+		m_iWorldModelFlags = q2::EF_ROTATE;
+		m_flLevitateHeight = ITEM_LEVITATE_HEIGHT;
 		m_sModel = "models/quake2/items/armor/shard.mdl";
 		m_sSound = "quake2/misc/ar2_pkup.wav";
 		m_iAmount = 2;
@@ -230,8 +241,9 @@ final class item_armor_jacket : ScriptBaseItemEntity, item_q2pickup
 {
 	item_armor_jacket()
 	{
-		m_iItemID = IT_ARMOR_JACKET;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iItemID = q2::IT_ARMOR_JACKET;
+		m_iWorldModelFlags = q2::EF_ROTATE;
+		m_flLevitateHeight = ITEM_LEVITATE_HEIGHT;
 		m_sModel = "models/quake2/items/armor/jacket.mdl";
 		m_sSound = "quake2/misc/ar1_pkup.wav";
 		m_iAmount = 25;
@@ -244,8 +256,9 @@ final class item_armor_combat : ScriptBaseItemEntity, item_q2pickup
 {
 	item_armor_combat()
 	{
-		m_iItemID = IT_ARMOR_COMBAT;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iItemID = q2::IT_ARMOR_COMBAT;
+		m_iWorldModelFlags = q2::EF_ROTATE;
+		m_flLevitateHeight = ITEM_LEVITATE_HEIGHT;
 		m_sModel = "models/quake2/items/armor/combat.mdl";
 		m_sSound = "quake2/misc/ar1_pkup.wav";
 		m_iAmount = 50;
@@ -258,8 +271,9 @@ final class item_armor_body : ScriptBaseItemEntity, item_q2pickup
 {
 	item_armor_body()
 	{
-		m_iItemID = IT_ARMOR_BODY;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iItemID = q2::IT_ARMOR_BODY;
+		m_iWorldModelFlags = q2::EF_ROTATE;
+		m_flLevitateHeight = ITEM_LEVITATE_HEIGHT;
 		m_sModel = "models/quake2/items/armor/body.mdl";
 		m_sSound = "quake2/misc/ar3_pkup.wav";
 		m_iAmount = 100;
@@ -275,7 +289,8 @@ final class item_q2shotgun : ScriptBaseItemEntity, item_q2pickup
 	{
 		m_sWeaponName = q2shotgun::WEAPON_NAME;
 		m_sModel = q2shotgun::MODEL_WORLD;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iWorldModelFlags = q2::EF_ROTATE;
+		m_flLevitateHeight = ITEM_LEVITATE_HEIGHT*2.0;
 		m_sSound = "quake2/misc/w_pkup.wav";
 		m_flRespawnTime = WEAPON_RESPAWN_TIME;
 	}
@@ -287,7 +302,8 @@ final class item_q2supershotgun : ScriptBaseItemEntity, item_q2pickup
 	{
 		m_sWeaponName = q2supershotgun::WEAPON_NAME;
 		m_sModel = q2supershotgun::MODEL_WORLD;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iWorldModelFlags = q2::EF_ROTATE;
+		m_flLevitateHeight = ITEM_LEVITATE_HEIGHT*2.0;
 		m_sSound = "quake2/misc/w_pkup.wav";
 		m_flRespawnTime = WEAPON_RESPAWN_TIME;
 	}
@@ -299,7 +315,8 @@ final class item_q2machinegun : ScriptBaseItemEntity, item_q2pickup
 	{
 		m_sWeaponName = q2machinegun::WEAPON_NAME;
 		m_sModel = q2machinegun::MODEL_WORLD;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iWorldModelFlags = q2::EF_ROTATE;
+		m_flLevitateHeight = ITEM_LEVITATE_HEIGHT*2.0;
 		m_sSound = "quake2/misc/w_pkup.wav";
 		m_flRespawnTime = WEAPON_RESPAWN_TIME;
 	}
@@ -311,7 +328,8 @@ final class item_q2chaingun : ScriptBaseItemEntity, item_q2pickup
 	{
 		m_sWeaponName = q2chaingun::WEAPON_NAME;
 		m_sModel = q2chaingun::MODEL_WORLD;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iWorldModelFlags = q2::EF_ROTATE;
+		m_flLevitateHeight = ITEM_LEVITATE_HEIGHT*2.0;
 		m_sSound = "quake2/misc/w_pkup.wav";
 		m_flRespawnTime = WEAPON_RESPAWN_TIME;
 	}
@@ -323,7 +341,7 @@ final class item_q2grenades : ScriptBaseItemEntity, item_q2pickup
 	{
 		m_sWeaponName = q2grenades::WEAPON_NAME;
 		m_sModel = q2grenades::MODEL_WORLD;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iWorldModelFlags = q2::EF_ROTATE;
 		m_sSound = "quake2/misc/w_pkup.wav";
 		m_flRespawnTime = WEAPON_RESPAWN_TIME;
 	}
@@ -335,7 +353,8 @@ final class item_q2grenadelauncher : ScriptBaseItemEntity, item_q2pickup
 	{
 		m_sWeaponName = q2grenadelauncher::WEAPON_NAME;
 		m_sModel = q2grenadelauncher::MODEL_WORLD;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iWorldModelFlags = q2::EF_ROTATE;
+		m_flLevitateHeight = ITEM_LEVITATE_HEIGHT*2.0;
 		m_sSound = "quake2/misc/w_pkup.wav";
 		m_flRespawnTime = WEAPON_RESPAWN_TIME;
 	}
@@ -347,7 +366,8 @@ final class item_q2rocketlauncher : ScriptBaseItemEntity, item_q2pickup
 	{
 		m_sWeaponName = q2rocketlauncher::WEAPON_NAME;
 		m_sModel = q2rocketlauncher::MODEL_WORLD;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iWorldModelFlags = q2::EF_ROTATE;
+		m_flLevitateHeight = ITEM_LEVITATE_HEIGHT*2.0;
 		m_sSound = "quake2/misc/w_pkup.wav";
 		m_flRespawnTime = WEAPON_RESPAWN_TIME;
 	}
@@ -359,7 +379,8 @@ final class item_q2hyperblaster : ScriptBaseItemEntity, item_q2pickup
 	{
 		m_sWeaponName = q2hyperblaster::WEAPON_NAME;
 		m_sModel = q2hyperblaster::MODEL_WORLD;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iWorldModelFlags = q2::EF_ROTATE;
+		m_flLevitateHeight = ITEM_LEVITATE_HEIGHT*2.0;
 		m_sSound = "quake2/misc/w_pkup.wav";
 		m_flRespawnTime = WEAPON_RESPAWN_TIME;
 	}
@@ -371,7 +392,8 @@ final class item_q2railgun : ScriptBaseItemEntity, item_q2pickup
 	{
 		m_sWeaponName = q2railgun::WEAPON_NAME;
 		m_sModel = q2railgun::MODEL_WORLD;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iWorldModelFlags = q2::EF_ROTATE;
+		m_flLevitateHeight = ITEM_LEVITATE_HEIGHT*2.0;
 		m_sSound = "quake2/misc/w_pkup.wav";
 		m_flRespawnTime = WEAPON_RESPAWN_TIME;
 	}
@@ -383,7 +405,8 @@ final class item_q2bfg : ScriptBaseItemEntity, item_q2pickup
 	{
 		m_sWeaponName = q2bfg::WEAPON_NAME;
 		m_sModel = q2bfg::MODEL_WORLD;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iWorldModelFlags = q2::EF_ROTATE;
+		m_flLevitateHeight = ITEM_LEVITATE_HEIGHT*2.0;
 		m_sSound = "quake2/misc/w_pkup.wav";
 		m_flRespawnTime = WEAPON_RESPAWN_TIME;
 	}
@@ -394,8 +417,8 @@ final class item_bandolier : ScriptBaseItemEntity, item_q2pickup
 {
 	item_bandolier()
 	{
-		m_iItemID = IT_ITEM_BANDOLIER;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iItemID = q2::IT_ITEM_BANDOLIER;
+		m_iWorldModelFlags = q2::EF_ROTATE;
 		m_sModel = "models/quake2/items/bandolier.mdl";
 		m_sSound = "quake2/items/pkup.wav";
 		m_iAmount = 60;
@@ -408,8 +431,8 @@ final class item_pack : ScriptBaseItemEntity, item_q2pickup
 {
 	item_pack()
 	{
-		m_iItemID = IT_ITEM_PACK;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iItemID = q2::IT_ITEM_PACK;
+		m_iWorldModelFlags = q2::EF_ROTATE;
 		m_sModel = "models/quake2/items/pack.mdl";
 		m_sSound = "quake2/items/pkup.wav";
 		m_iAmount = 180;
@@ -418,12 +441,41 @@ final class item_pack : ScriptBaseItemEntity, item_q2pickup
 	}
 }
 
+//KEYS
+final class key_red_key : ScriptBaseItemEntity, item_q2pickup
+{
+	key_red_key()
+	{
+		m_iItemID = q2::IT_KEY_RED_KEY;
+		m_sItemName = "Red Key";
+		m_iWorldModelFlags = q2::EF_ROTATE;
+		m_sModel = "models/quake2/items/keys/red_key.mdl";
+		m_sSound = "quake2/items/pkup.wav";
+		m_flRespawnTime = 2.0; //??
+	}
+}
+
+//GROUND ZERO
+final class item_q2plasmabeam : ScriptBaseItemEntity, item_q2pickup
+{
+	item_q2plasmabeam()
+	{
+		m_sWeaponName = q2plasmabeam::WEAPON_NAME;
+		m_sModel = q2plasmabeam::MODEL_WORLD;
+		m_iWorldModelFlags = q2::EF_ROTATE;
+		m_flLevitateHeight = ITEM_LEVITATE_HEIGHT*2.0;
+		m_sSound = "quake2/misc/w_pkup.wav";
+		m_flRespawnTime = WEAPON_RESPAWN_TIME;
+	}
+}
+
+
 /*final class item_template : ScriptBaseItemEntity, item_q2pickup
 {
 	item_template()
 	{
 		m_iItemID = IT_NULL;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iWorldModelFlags = q2::EF_ROTATE;
 		m_sModel = "models/quake2/items/template.mdl";
 		m_sSound = "quake2/items/pkup.wav";
 		m_flRespawnTime = 60.0;
@@ -432,15 +484,21 @@ final class item_pack : ScriptBaseItemEntity, item_q2pickup
 
 mixin class item_q2pickup
 {
+	protected int m_iSpawnFlags;
+
+	protected bool m_bTargetsUsed;
+
 	protected string m_sModel;
 	protected string m_sSound;
 	protected string m_sWeaponName = "";
 	protected string m_sAmmoName = "";
+	protected string m_sItemName = ""; //for keys
 
 	protected int m_iAmount;
 	protected int m_iAmountMax;
-	protected float m_flRespawnTime = 2; //20
+	protected float m_flRespawnTime = 20;
 
+	protected float m_flLevitateHeight = ITEM_LEVITATE_HEIGHT;
 	protected int m_iWorldModelFlags = 0;
 	protected int m_iItemID;
 
@@ -449,7 +507,7 @@ mixin class item_q2pickup
 		if( szKey == "m_flCustomRespawnTime" )
 		{
 			if( atof(szValue) >= 0.0 )
-				m_flRespawnTime = atof(szValue);
+				m_flRespawnTime = atof( szValue );
 
 			return true;
 		}
@@ -459,10 +517,23 @@ mixin class item_q2pickup
 
 	void Spawn()
 	{
+		if( !q2::ShouldEntitySpawn(self) )
+		{
+			g_EntityFuncs.Remove( self );
+			return;
+		}
+
+		m_iSpawnFlags = pev.spawnflags;
+		pev.spawnflags = 0;
+
 		Precache();
 		g_EntityFuncs.SetModel( self, m_sModel );
+		g_EntityFuncs.SetSize( self.pev, Vector(-16, -16, 0), Vector(16, 16, 16) );
 
 		BaseClass.Spawn();
+
+		if( !m_sItemName.IsEmpty() )
+			pev.netname = m_sItemName;
 
 		if( !m_sWeaponName.IsEmpty() )
 		{
@@ -474,33 +545,15 @@ mixin class item_q2pickup
 		else
 			SelectTouchFunction();
 
-		if( (m_iWorldModelFlags & EF_ROTATE) != 0 )
+		if( HasFlags(m_iWorldModelFlags, q2::EF_ROTATE) )
 		{
-			TraceResult tr;
-			Vector vecStart = pev.origin;
-			Vector vecEnd = vecStart + Vector( 0, 0, -72 );
-			g_Utility.TraceLine( vecStart, vecEnd, dont_ignore_monsters, self.edict(), tr );
-
-			if( tr.flFraction < 1.0 )
-			{
-				if (tr.pHit !is null)
-				{
-					CBaseEntity@ pHit = g_EntityFuncs.Instance( tr.pHit );
-
-					if( pHit is null or pHit.IsBSPModel() )
-					{
-						Vector vecOrigin = pev.origin;
-						vecOrigin.z = tr.vecEndPos.z + ITEM_LEVITATE_HEIGHT;
-						g_EntityFuncs.SetOrigin( self, vecOrigin );
-					}
-				}
-			}
+			LevitateItem();
 
 			SetThink( ThinkFunction(this.RotateThink) );
-			pev.nextthink = g_Engine.time + 0.01;
+			pev.nextthink = g_Engine.time + 0.1;
 		}
 
-		if( (m_iWorldModelFlags & EF_BOB) != 0 )
+		if( (m_iWorldModelFlags & q2::EF_BOB) != 0 )
 		{
 			pev.movetype = MOVETYPE_TOSS;
 			pev.gravity = 0.5;
@@ -515,11 +568,76 @@ mixin class item_q2pickup
 		g_SoundSystem.PrecacheSound( m_sSound );
 	}
 
+
+	void BaseTouch( CBaseEntity@ pOther )
+	{
+		if( !m_bTargetsUsed )
+		{
+			G_UseTargets( pOther, USE_TOGGLE, 0.0 );
+			m_bTargetsUsed = true;
+		}
+	}
+
+	void G_UseTargets( CBaseEntity@ pActivator, USE_TYPE useType, float flValue )
+	{
+		self.SUB_UseTargets( pActivator, useType, flValue );
+
+		if( !string(pev.message).IsEmpty() and !pActivator.pev.FlagBitSet(FL_MONSTER) )
+		{
+			if( q2::IsCoop() )
+			{
+				for( int i = 1; i <= g_Engine.maxClients; ++i )
+				{
+					CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex( i );
+
+					if( pPlayer !is null and pPlayer.IsConnected() )
+						g_EngineFuncs.ClientPrintf( pPlayer, print_center, string(pev.message) );
+				}
+			}
+			else
+			{
+				CBasePlayer@ pPlayer = cast<CBasePlayer@>( pActivator );
+				g_EngineFuncs.ClientPrintf( pPlayer, print_center, string(pev.message) );
+			}
+		}
+	}
+
+	void LevitateItem()
+	{
+		TraceResult tr;
+		Vector vecStart = pev.origin;
+		Vector vecEnd = vecStart + Vector( 0, 0, -72 );
+		g_Utility.TraceLine( vecStart, vecEnd, dont_ignore_monsters, self.edict(), tr );
+
+		if( tr.flFraction < 1.0 )
+		{
+			if (tr.pHit !is null)
+			{
+				CBaseEntity@ pHit = g_EntityFuncs.Instance( tr.pHit );
+
+				if( pHit is null or pHit.IsBSPModel() )
+				{
+					Vector vecOrigin = pev.origin;
+					vecOrigin.z = tr.vecEndPos.z + m_flLevitateHeight;
+					g_EntityFuncs.SetOrigin( self, vecOrigin );
+				}
+			}
+		}
+	}
+	
 	void RotateThink()
 	{
+		if( pev.FlagBitSet(FL_ONGROUND) )
+		{
+			if( pev.movetype != MOVETYPE_NONE )
+				pev.movetype = MOVETYPE_NONE;
+
+			LevitateItem();
+		}
+
         pev.angles.y += 1.0;
 
-		if( (m_iWorldModelFlags & EF_BOB) != 0 and g_bRerelease )
+		if( (m_iWorldModelFlags & q2::EF_BOB) != 0 and g_bRerelease )
 		{
 			//HACK
 			if( pev.velocity.z == 0.0 )
@@ -539,7 +657,7 @@ mixin class item_q2pickup
 				g_EntityFuncs.SetOrigin( self, vecOrigin );
 			}
 
-			pev.velocity.z -= pev.gravity * g_EngineFuncs.CVarGetFloat("sv_gravity") * 0.1; //FRAMETIME;*/
+			pev.velocity.z -= pev.gravity * g_EngineFuncs.CVarGetFloat("sv_gravity") * q2::FRAMETIME;*/
 		}
 
 		pev.nextthink = g_Engine.time + 0.01;
@@ -555,7 +673,7 @@ mixin class item_q2pickup
 		{
 			@pev.owner = null;
 
-			if( (pev.spawnflags & SF_NO_RESPAWN) == 0 )
+			if( !HasFlags(m_iSpawnFlags, SF_NO_RESPAWN) )
 				SetupRespawn();
 			else
 				g_EntityFuncs.Remove( self );
@@ -570,7 +688,7 @@ mixin class item_q2pickup
 		CustomKeyvalues@ pCustom = pOther.GetCustomKeyvalues();
 		float flPlayerMaxHealth = PLAYER_MAX_HEALTH + pCustom.GetKeyvalue(MAX_HEALTH_KVN).GetInteger();
 
-		if( m_iItemID != IT_HEALTH_SMALL and m_iItemID != IT_HEALTH_MEGA )
+		if( m_iItemID != q2::IT_HEALTH_SMALL and m_iItemID != q2::IT_HEALTH_MEGA )
 		{
 			if( pOther.pev.health >= flPlayerMaxHealth )
 				return;
@@ -580,14 +698,14 @@ mixin class item_q2pickup
 
 		if( pOther.pev.health > PLAYER_MAX_HEALTH )
 		{
-			if( m_iItemID != IT_HEALTH_SMALL and m_iItemID != IT_HEALTH_MEGA )
+			if( m_iItemID != q2::IT_HEALTH_SMALL and m_iItemID != q2::IT_HEALTH_MEGA )
 			{
 				pOther.pev.max_health = flPlayerMaxHealth;
 				pOther.pev.health = flPlayerMaxHealth;
 			}
-			else if( m_iItemID == IT_HEALTH_SMALL )
+			else if( m_iItemID == q2::IT_HEALTH_SMALL )
 				pOther.pev.max_health = flPlayerMaxHealth + m_iAmount;
-			else if( m_iItemID == IT_HEALTH_MEGA )
+			else if( m_iItemID == q2::IT_HEALTH_MEGA )
 				pOther.pev.max_health = flPlayerMaxHealth;
 		}
 
@@ -597,9 +715,11 @@ mixin class item_q2pickup
 
 		g_SoundSystem.EmitSound( pOther.edict(), CHAN_ITEM, m_sSound, VOL_NORM, ATTN_NORM );
 
-		if( m_iItemID != IT_HEALTH_MEGA )
+		BaseTouch( pOther );
+
+		if( m_iItemID != q2::IT_HEALTH_MEGA )
 		{
-			if( (pev.spawnflags & SF_NO_RESPAWN) == 0 )
+			if( !HasFlags(m_iSpawnFlags, SF_NO_RESPAWN) )
 				SetupRespawn();
 			else
 				g_EntityFuncs.Remove( self );
@@ -619,7 +739,7 @@ mixin class item_q2pickup
 		if( !pOther.IsPlayer() or !pOther.IsAlive() )
 			return;
 
-		if( m_iItemID != IT_ARMOR_SHARD )
+		if( m_iItemID != q2::IT_ARMOR_SHARD )
 		{
 			if( pOther.pev.armorvalue >= m_iAmountMax )
 				return;
@@ -627,11 +747,11 @@ mixin class item_q2pickup
 
 		pOther.pev.armorvalue += m_iAmount;
 
-		if( m_iItemID != IT_ARMOR_BODY )
+		if( m_iItemID != q2::IT_ARMOR_BODY )
 		{
 			if( pOther.pev.armorvalue > m_iAmountMax )
 			{
-				if( m_iItemID != IT_ARMOR_SHARD )
+				if( m_iItemID != q2::IT_ARMOR_SHARD )
 					pOther.pev.armorvalue = m_iAmountMax;
 				else
 					pOther.pev.armortype += m_iAmount;
@@ -652,7 +772,9 @@ mixin class item_q2pickup
 
 		g_SoundSystem.EmitSound( pOther.edict(), CHAN_ITEM, m_sSound, VOL_NORM, ATTN_NORM );
 
-		if( (pev.spawnflags & SF_NO_RESPAWN) == 0 )
+		BaseTouch( pOther );
+
+		if( !HasFlags(m_iSpawnFlags, SF_NO_RESPAWN) )
 			SetupRespawn();
 		else
 			g_EntityFuncs.Remove( self );
@@ -679,7 +801,9 @@ mixin class item_q2pickup
 
 		g_SoundSystem.EmitSound( pOther.edict(), CHAN_ITEM, m_sSound, VOL_NORM, ATTN_NORM );
 
-		if( (pev.spawnflags & SF_NO_RESPAWN) == 0 )
+		BaseTouch( pOther );
+
+		if( !HasFlags(m_iSpawnFlags, SF_NO_RESPAWN) )
 			SetupRespawn();
 		else
 			g_EntityFuncs.Remove( self );
@@ -707,7 +831,9 @@ mixin class item_q2pickup
 
 		g_SoundSystem.EmitSound( pOther.edict(), CHAN_ITEM, m_sSound, VOL_NORM, ATTN_NORM );
 
-		if( (pev.spawnflags & SF_NO_RESPAWN) == 0 )
+		BaseTouch( pOther );
+
+		if( !HasFlags(m_iSpawnFlags, SF_NO_RESPAWN) )
 			SetupRespawn();
 		else
 			g_EntityFuncs.Remove( self );
@@ -731,7 +857,9 @@ mixin class item_q2pickup
 
 		g_SoundSystem.EmitSound( pOther.edict(), CHAN_ITEM, m_sSound, VOL_NORM, ATTN_NORM );
 
-		if( (pev.spawnflags & SF_NO_RESPAWN) == 0 )
+		BaseTouch( pOther );
+
+		if( !HasFlags(m_iSpawnFlags, SF_NO_RESPAWN) )
 			SetupRespawn();
 		else
 			g_EntityFuncs.Remove( self );
@@ -746,7 +874,7 @@ mixin class item_q2pickup
 		CustomKeyvalues@ pCustom = pPlayer.GetCustomKeyvalues();
 
 		//the original gets applied immediately
-		if( m_iItemID == IT_ITEM_ADRENALINE )
+		if( m_iItemID == q2::IT_ITEM_ADRENALINE )
 		{
 			if( q2items::g_bRerelease )
 			{
@@ -778,7 +906,9 @@ mixin class item_q2pickup
 
 		g_SoundSystem.EmitSound( pOther.edict(), CHAN_ITEM, m_sSound, VOL_NORM, ATTN_NORM );
 
-		if( (pev.spawnflags & SF_NO_RESPAWN) == 0 )
+		BaseTouch( pOther );
+
+		if( !HasFlags(m_iSpawnFlags, SF_NO_RESPAWN) )
 			SetupRespawn();
 		else
 			g_EntityFuncs.Remove( self );
@@ -806,7 +936,9 @@ mixin class item_q2pickup
 
 		g_SoundSystem.EmitSound( pOther.edict(), CHAN_ITEM, m_sSound, VOL_NORM, ATTN_NORM );
 
-		if( (pev.spawnflags & SF_NO_RESPAWN) == 0 )
+		BaseTouch( pOther );
+
+		if( !HasFlags(m_iSpawnFlags, SF_NO_RESPAWN) )
 			SetupRespawn();
 		else
 			g_EntityFuncs.Remove( self );
@@ -834,7 +966,38 @@ mixin class item_q2pickup
 
 		g_SoundSystem.EmitSound( pOther.edict(), CHAN_ITEM, m_sSound, VOL_NORM, ATTN_NORM );
 
-		if( (pev.spawnflags & SF_NO_RESPAWN) == 0 )
+		BaseTouch( pOther );
+
+		if( !HasFlags(m_iSpawnFlags, SF_NO_RESPAWN) )
+			SetupRespawn();
+		else
+			g_EntityFuncs.Remove( self );
+	}
+
+	void InvisTouch( CBaseEntity@ pOther )
+	{
+		if( !pOther.IsPlayer() or !pOther.IsAlive() )
+			return;
+
+		CBasePlayer@ pPlayer = cast<CBasePlayer@>(pOther);
+		if( pPlayer.HasNamedPlayerItem(INVISWEAP_NAME) !is null )
+			return;
+
+		CustomKeyvalues@ pCustom = pPlayer.GetCustomKeyvalues();
+
+		pPlayer.GiveNamedItem( INVISWEAP_NAME );
+
+		if( !pCustom.GetKeyvalue(INVIS_KVN).Exists() )
+		{
+			pCustom.InitializeKeyvalueWithDefault( INVIS_KVN );
+			pCustom.InitializeKeyvalueWithDefault( INVIS_KVN_TIME );
+		}
+
+		g_SoundSystem.EmitSound( pOther.edict(), CHAN_ITEM, m_sSound, VOL_NORM, ATTN_NORM );
+
+		BaseTouch( pOther );
+
+		if( !HasFlags(m_iSpawnFlags, SF_NO_RESPAWN) )
 			SetupRespawn();
 		else
 			g_EntityFuncs.Remove( self );
@@ -860,7 +1023,9 @@ mixin class item_q2pickup
  
 		g_SoundSystem.EmitSound( pOther.edict(), CHAN_ITEM, m_sSound, VOL_NORM, ATTN_NORM );
 
-		if( (pev.spawnflags & SF_NO_RESPAWN) == 0 )
+		BaseTouch( pOther );
+
+		if( !HasFlags(m_iSpawnFlags, SF_NO_RESPAWN) )
 			SetupRespawn();
 		else
 			g_EntityFuncs.Remove( self );
@@ -895,7 +1060,9 @@ mixin class item_q2pickup
  
 		g_SoundSystem.EmitSound( pOther.edict(), CHAN_ITEM, m_sSound, VOL_NORM, ATTN_NORM );
 
-		if( (pev.spawnflags & SF_NO_RESPAWN) == 0 )
+		BaseTouch( pOther );
+
+		if( !HasFlags(m_iSpawnFlags, SF_NO_RESPAWN) )
 			SetupRespawn();
 		else
 			g_EntityFuncs.Remove( self );
@@ -922,7 +1089,9 @@ mixin class item_q2pickup
 
 		g_SoundSystem.EmitSound( pOther.edict(), CHAN_ITEM, m_sSound, VOL_NORM, ATTN_NORM );
 
-		if( (pev.spawnflags & SF_NO_RESPAWN) == 0 )
+		BaseTouch( pOther );
+
+		if( !HasFlags(m_iSpawnFlags, SF_NO_RESPAWN) )
 			SetupRespawn();
 		else
 			g_EntityFuncs.Remove( self );
@@ -962,7 +1131,32 @@ mixin class item_q2pickup
 
 		g_SoundSystem.EmitSound( pOther.edict(), CHAN_ITEM, m_sSound, VOL_NORM, ATTN_NORM );
 
-		if( (pev.spawnflags & SF_NO_RESPAWN) == 0 )
+		BaseTouch( pOther );
+
+		if( !HasFlags(m_iSpawnFlags, SF_NO_RESPAWN) )
+			SetupRespawn();
+		else
+			g_EntityFuncs.Remove( self );
+	}
+
+	void KeyTouch( CBaseEntity@ pOther )
+	{
+		if( !pOther.IsPlayer() or !pOther.IsAlive() )
+			return;
+
+		CBasePlayer@ pPlayer = cast<CBasePlayer@>(pOther);
+		if( HasNamedPlayerItem(pPlayer, self.GetClassname()) !is null )
+			return;
+
+		CustomKeyvalues@ pCustom = pPlayer.GetCustomKeyvalues();
+
+		CreateAndGiveKey( pPlayer );
+
+		g_SoundSystem.EmitSound( pOther.edict(), CHAN_ITEM, m_sSound, VOL_NORM, ATTN_NORM );
+
+		BaseTouch( pOther );
+
+		if( !HasFlags(m_iSpawnFlags, SF_NO_RESPAWN) )
 			SetupRespawn();
 		else
 			g_EntityFuncs.Remove( self );
@@ -978,7 +1172,9 @@ mixin class item_q2pickup
 
 		g_SoundSystem.EmitSound( pOther.edict(), CHAN_ITEM, m_sSound, VOL_NORM, ATTN_NORM );
 
-		if( (pev.spawnflags & SF_NO_RESPAWN) == 0 )
+		BaseTouch( pOther );
+
+		if( !HasFlags(m_iSpawnFlags, SF_NO_RESPAWN) )
 			SetupRespawn();
 		else
 			g_EntityFuncs.Remove( self );
@@ -1022,7 +1218,7 @@ mixin class item_q2pickup
 		else
 			SelectTouchFunction();
 
-		if( (m_iWorldModelFlags & EF_ROTATE) != 0 )
+		if( (m_iWorldModelFlags & q2::EF_ROTATE) != 0 )
 		{
 			SetThink( ThinkFunction(this.RotateThink) );
 			pev.nextthink = g_Engine.time;
@@ -1033,68 +1229,68 @@ mixin class item_q2pickup
 	{
 		switch( m_iItemID )
 		{
-			case IT_ITEM_QUAD:
+			case q2::IT_ITEM_QUAD:
 			{
 				SetTouch( TouchFunction(this.QuadTouch) );
 				break;
 			}
 
-			case IT_ITEM_INVULNERABILITY:
+			case q2::IT_ITEM_INVULNERABILITY:
 			{
 				SetTouch( TouchFunction(this.InvulTouch) );
 				break;
 			}
 
-			case IT_ITEM_SILENCER:
+			case q2::IT_ITEM_SILENCER:
 			{
 				SetTouch( TouchFunction(this.SilencerTouch) );
 				break;
 			}
 
-			case IT_ITEM_BANDOLIER:
+			case q2::IT_ITEM_BANDOLIER:
 			{
 				SetTouch( TouchFunction(this.BandolierTouch) );
 				break;
 			}
 
-			case IT_ITEM_PACK:
+			case q2::IT_ITEM_PACK:
 			{
 				SetTouch( TouchFunction(this.PackTouch) );
 				break;
 			}
 
-			case IT_ITEM_POWER_SCREEN:
-			case IT_ITEM_POWER_SHIELD:
+			case q2::IT_ITEM_POWER_SCREEN:
+			case q2::IT_ITEM_POWER_SHIELD:
 			{
 				SetTouch( TouchFunction(this.ParmorTouch) );
 				break;
 			}
 
-			case IT_ITEM_REBREATHER:
+			case q2::IT_ITEM_REBREATHER:
 			{
 				SetTouch( TouchFunction(this.RebreatherTouch) );
 				break;
 			}
 
-			case IT_ITEM_ENVIROSUIT:
+			case q2::IT_ITEM_ENVIROSUIT:
 			{
 				SetTouch( TouchFunction(this.EnvirosuitTouch) );
 				break;
 			}
 
-			case IT_ARMOR_BODY:
-			case IT_ARMOR_COMBAT:
-			case IT_ARMOR_JACKET:
-			case IT_ARMOR_SHARD:
+			case q2::IT_ARMOR_BODY:
+			case q2::IT_ARMOR_COMBAT:
+			case q2::IT_ARMOR_JACKET:
+			case q2::IT_ARMOR_SHARD:
 			{
 				SetTouch( TouchFunction(this.ArmorTouch) );
 				break;
 			}
 
-			case IT_HEALTH_SMALL:
-			case IT_HEALTH_MEDIUM:
-			case IT_HEALTH_LARGE:
-			case IT_HEALTH_MEGA:
+			case q2::IT_HEALTH_SMALL:
+			case q2::IT_HEALTH_MEDIUM:
+			case q2::IT_HEALTH_LARGE:
+			case q2::IT_HEALTH_MEGA:
 			{
 				SetTouch( TouchFunction(this.HealthTouch) );
 
@@ -1105,13 +1301,64 @@ mixin class item_q2pickup
 				break;
 			}
 
-			case IT_ITEM_ADRENALINE:
-			case IT_ITEM_ANCIENT_HEAD:
+			case q2::IT_ITEM_ADRENALINE:
+			case q2::IT_ITEM_ANCIENT_HEAD:
 			{
 				SetTouch( TouchFunction(this.HealthBoostTouch) );
 				break;
 			}
+
+			case q2::IT_KEY_RED_KEY:
+			{
+				SetTouch( TouchFunction(this.KeyTouch) );
+				break;
+			}
+
+			//N64
+			case q2::IT_ITEM_INVISIBILITY:
+			{
+				SetTouch( TouchFunction(this.InvisTouch) );
+				break;
+			}
 		}
+	}
+
+	void CreateAndGiveKey( CBasePlayer@ pPlayer )
+	{
+		dictionary keys;
+		GetKeyInfo( keys );
+
+		keys[ "origin" ] = pev.origin.ToString();
+		keys[ "model" ] = string( pev.model );
+		keys[ "weight" ] = "0";
+		keys[ "holder_can_drop" ] = "0";
+		keys[ "carried_hidden" ] = "1";
+		keys[ "target_on_collect" ] = string( pev.target );
+		keys[ "item_name" ] = string( self.GetClassname() );
+		keys[ "display_name" ] = m_sItemName;
+		keys[ "netname" ] = string( self.GetClassname() );
+		keys[ "spawnflags" ] = "1280"; //USE Only, Disable Respawn
+
+		CBaseEntity@ pKey = g_EntityFuncs.CreateEntity( "item_inventory", keys, true );
+		pKey.Use( pPlayer, pPlayer, USE_ON, 0.0 );
+	}
+
+	void GetKeyInfo( dictionary &out keys )
+	{
+		switch( m_iItemID )
+		{
+			case q2::IT_KEY_RED_KEY:
+			{
+				keys[ "description" ] = "Normal door key - red";
+				keys[ "item_icon" ] = "quake2/pics/k_redkey.spr";
+				break;
+			}
+		}
+	}
+
+	bool HasFlags( int iFlagVariable, int iFlags )
+	{
+		return (iFlagVariable & iFlags) != 0;
 	}
 }
 
@@ -1174,20 +1421,37 @@ class weapon_q2inventory : ScriptBasePlayerWeaponEntity
 	}
 }
 
+CItemInventory@ HasNamedPlayerItem( CBasePlayer@ pPlayer, string sItemName )
+{
+	InventoryList@ pInventory = pPlayer.get_m_pInventory();
+	CItemInventory@ pItem = null;
+
+	while( pInventory !is null )
+	{
+		@pItem = cast<CItemInventory@>(pInventory.hItem.GetEntity());
+		if( pItem !is null and pItem.m_szItemName == sItemName )
+			return pItem;
+
+		@pInventory = pInventory.pNext;
+	}
+
+	return null;
+}
+
 void UpdatePowerArmorHUD( CBasePlayer@ pPlayer )
 {
 	HUDNumDisplayParams hudParams;
 	CustomKeyvalues@ pCustom = pPlayer.GetCustomKeyvalues();
 
-	if( q2::PowerArmorType(pPlayer) == q2items::POWER_ARMOR_NONE )
+	if( q2::PowerArmorType(pPlayer) == q2::POWER_ARMOR_NONE )
 	{
 		g_PlayerFuncs.HudToggleElement( pPlayer, q2items::PARMOR_HUD_CHANNEL, false );
 		return;
 	}
-	else if( q2::PowerArmorType(pPlayer) == q2items::POWER_ARMOR_SCREEN )
-		q2items::GetHudParams( pPlayer, q2items::IT_ITEM_POWER_SCREEN, hudParams );
-	else if( q2::PowerArmorType(pPlayer) == q2items::POWER_ARMOR_SHIELD )
-		q2items::GetHudParams( pPlayer, q2items::IT_ITEM_POWER_SHIELD, hudParams );
+	else if( q2::PowerArmorType(pPlayer) == q2::POWER_ARMOR_SCREEN )
+		q2items::GetHudParams( pPlayer, q2::IT_ITEM_POWER_SCREEN, hudParams );
+	else if( q2::PowerArmorType(pPlayer) == q2::POWER_ARMOR_SHIELD )
+		q2items::GetHudParams( pPlayer, q2::IT_ITEM_POWER_SHIELD, hudParams );
 
 	int iAmmo = pPlayer.m_rgAmmo( g_PlayerFuncs.GetAmmoIndex("q2cells") );
 	if( iAmmo > 0 )
@@ -1205,25 +1469,25 @@ void GetHudParams( CBasePlayer@ pPlayer, int iItem, HUDNumDisplayParams &out hud
 
 	switch( iItem )
 	{
-		case IT_ITEM_SILENCER:
+		case q2::IT_ITEM_SILENCER:
 		{
 			hudNumParams.spritename = SILENCER_ICON;
 			hudNumParams.channel = SILENCER_HUD_CHANNEL;
 			hudNumParams.flags = HUD_ELEM_SCR_CENTER_X | HUD_NUM_RIGHT_ALIGN | HUD_NUM_DONT_DRAW_ZERO; //HUD_ELEM_DEFAULT_ALPHA ??
-			hudNumParams.x = 0.85;
-			hudNumParams.y = 0.94;
+			hudNumParams.x = 0.85; //ammo icon
+			hudNumParams.y = 0.94; //above ammo icon
 			hudNumParams.defdigits = 2;
 			hudNumParams.maxdigits = 2;
 
 			break;
 		}
 
-		case IT_ITEM_REBREATHER:
+		case q2::IT_ITEM_REBREATHER:
 		{
 			hudNumParams.spritename = BREATHER_ICON;
 			hudNumParams.channel = BREATHER_HUD_CHANNEL;
 			hudNumParams.flags = HUD_ELEM_SCR_CENTER_X | HUD_NUM_LEADING_ZEROS | HUD_TIME_SECONDS | HUD_TIME_COUNT_DOWN;
-			hudNumParams.x = -0.41;
+			hudNumParams.x = -0.41; //between health and armor icons
 			hudNumParams.y = 0.94;
 			hudNumParams.defdigits = 2;
 			hudNumParams.maxdigits = 2;
@@ -1232,13 +1496,13 @@ void GetHudParams( CBasePlayer@ pPlayer, int iItem, HUDNumDisplayParams &out hud
 			break;
 		}
 
-		case IT_ITEM_ENVIROSUIT:
+		case q2::IT_ITEM_ENVIROSUIT:
 		{
 			hudNumParams.spritename = ENVIRO_ICON;
 			hudNumParams.channel = ENVIRO_HUD_CHANNEL;
 			hudNumParams.flags = HUD_ELEM_SCR_CENTER_X | HUD_NUM_LEADING_ZEROS | HUD_TIME_SECONDS | HUD_TIME_COUNT_DOWN;
-			hudNumParams.x = -0.41;
-			hudNumParams.y = 0.89;
+			hudNumParams.x = -0.41; //between health and armor icons
+			hudNumParams.y = 0.89; //above enviro
 			hudNumParams.defdigits = 2;
 			hudNumParams.maxdigits = 2;
 			hudNumParams.value = ENVIRO_DURATION;
@@ -1246,14 +1510,14 @@ void GetHudParams( CBasePlayer@ pPlayer, int iItem, HUDNumDisplayParams &out hud
 			break;
 		}
 
-		case IT_ITEM_POWER_SCREEN:
-		case IT_ITEM_POWER_SHIELD:
+		case q2::IT_ITEM_POWER_SCREEN:
+		case q2::IT_ITEM_POWER_SHIELD:
 		{
-			hudNumParams.spritename = (iItem == IT_ITEM_POWER_SCREEN) ? PSCREEN_HUD_ICON : PSHIELD_HUD_ICON;
+			hudNumParams.spritename = (iItem == q2::IT_ITEM_POWER_SCREEN) ? PSCREEN_HUD_ICON : PSHIELD_HUD_ICON;
 			hudNumParams.channel = PARMOR_HUD_CHANNEL;
 			hudNumParams.flags = HUD_ELEM_SCR_CENTER_X | HUD_NUM_LEADING_ZEROS;
-			hudNumParams.x = -0.345;
-			hudNumParams.y = 0.94;
+			hudNumParams.x = -0.345; //armor icon
+			hudNumParams.y = 0.94; //above armor icon
 			hudNumParams.defdigits = 3;
 			hudNumParams.maxdigits = 3;
 			hudNumParams.value = pPlayer.m_rgAmmo(g_PlayerFuncs.GetAmmoIndex("q2cells"));
@@ -1261,13 +1525,13 @@ void GetHudParams( CBasePlayer@ pPlayer, int iItem, HUDNumDisplayParams &out hud
 			break;
 		}
 
-		case IT_ITEM_INVULNERABILITY:
+		case q2::IT_ITEM_INVULNERABILITY:
 		{
 			hudNumParams.spritename = INVUL_ICON;
 			hudNumParams.channel = INVUL_HUD_CHANNEL;
 			hudNumParams.flags = HUD_ELEM_SCR_CENTER_X | HUD_NUM_LEADING_ZEROS | HUD_TIME_SECONDS | HUD_TIME_COUNT_DOWN;
-			hudNumParams.x = -0.5;
-			hudNumParams.y = 0.94;
+			hudNumParams.x = -0.5; //health icon
+			hudNumParams.y = 0.94; //above health
 			hudNumParams.defdigits = 2;
 			hudNumParams.maxdigits = 2;
 			hudNumParams.value = INVUL_DURATION;
@@ -1275,13 +1539,26 @@ void GetHudParams( CBasePlayer@ pPlayer, int iItem, HUDNumDisplayParams &out hud
 			break;
 		}
 
-		case IT_ITEM_QUAD:
+		case q2::IT_ITEM_QUAD:
 		{
 			hudNumParams.spritename = QUAD_ICON;
 			hudNumParams.channel = QUAD_HUD_CHANNEL;
 			hudNumParams.flags = HUD_ELEM_SCR_CENTER_X | HUD_NUM_RIGHT_ALIGN | HUD_NUM_LEADING_ZEROS | HUD_TIME_SECONDS | HUD_TIME_COUNT_DOWN;
-			hudNumParams.x = 0.85;
-			hudNumParams.y = 0.89;
+			hudNumParams.x = 0.85; //ammo icon
+			hudNumParams.y = 0.89; //above silencer
+			hudNumParams.defdigits = 2;
+			hudNumParams.maxdigits = 2;
+
+			break;
+		}
+
+		case q2::IT_ITEM_INVISIBILITY:
+		{
+			hudNumParams.spritename = INVIS_ICON;
+			hudNumParams.channel = INVIS_HUD_CHANNEL;
+			hudNumParams.flags = HUD_ELEM_SCR_CENTER_X | HUD_NUM_LEADING_ZEROS | HUD_TIME_SECONDS | HUD_TIME_COUNT_DOWN;
+			hudNumParams.x = -0.5; //health icon
+			hudNumParams.y = 0.89; //above invul
 			hudNumParams.defdigits = 2;
 			hudNumParams.maxdigits = 2;
 
@@ -1296,23 +1573,23 @@ bool IsItemActive( CBasePlayer@ pPlayer, int iItem )
 
 	switch( iItem )
 	{
-		case IT_ITEM_QUAD:
+		case q2::IT_ITEM_QUAD:
 			return pCustom.GetKeyvalue(QUAD_KVN).GetInteger() >= 1;
 
-		case IT_ITEM_INVULNERABILITY:
+		case q2::IT_ITEM_INVULNERABILITY:
 			return pCustom.GetKeyvalue(INVUL_KVN).GetInteger() >= 1;
 
-		case IT_ITEM_SILENCER:
+		case q2::IT_ITEM_SILENCER:
 			return pCustom.GetKeyvalue(SILENCER_KVN).GetInteger() >= 1;
 
-		case IT_ITEM_POWER_SCREEN:
-		case IT_ITEM_POWER_SHIELD:
+		case q2::IT_ITEM_POWER_SCREEN:
+		case q2::IT_ITEM_POWER_SHIELD:
 			return pCustom.GetKeyvalue(PARMOR_KVN).GetInteger() >= 1;
 
-		case IT_ITEM_REBREATHER:
+		case q2::IT_ITEM_REBREATHER:
 			return pCustom.GetKeyvalue(BREATHER_KVN).GetInteger() >= 1;
 
-		case IT_ITEM_ENVIROSUIT:
+		case q2::IT_ITEM_ENVIROSUIT:
 			return pCustom.GetKeyvalue(ENVIRO_KVN).GetInteger() >= 1;
 	}
 
@@ -1345,7 +1622,7 @@ HookReturnCode PlayerTakeDamage( DamageInfo@ pDamageInfo )
 
 	int iPowerArmorType = q2::PowerArmorType( cast<CBasePlayer@>(pDamageInfo.pVictim) );
 
-	if( iPowerArmorType != q2items::POWER_ARMOR_NONE )
+	if( iPowerArmorType != q2::POWER_ARMOR_NONE )
 	{
 		float flTake = pDamageInfo.flDamage;
 		//g_Game.AlertMessage( at_notice, "flDamage: %1\n", flTake );
@@ -1371,6 +1648,12 @@ void Register()
 	g_CustomEntityFuncs.RegisterCustomEntity( "q2items::ammo_q2rockets", "ammo_q2rockets" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "q2items::ammo_q2cells", "ammo_q2cells" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "q2items::ammo_q2slugs", "ammo_q2slugs" );
+	g_Game.PrecacheOther( "ammo_q2shells" );
+	g_Game.PrecacheOther( "ammo_q2bullets" );
+	g_Game.PrecacheOther( "ammo_q2grenades" );
+	g_Game.PrecacheOther( "ammo_q2rockets" );
+	g_Game.PrecacheOther( "ammo_q2cells" );
+	g_Game.PrecacheOther( "ammo_q2slugs" );
 
 	g_CustomEntityFuncs.RegisterCustomEntity( "q2items::item_health_small", NAME_HEALTH_SMALL );
 	g_CustomEntityFuncs.RegisterCustomEntity( "q2items::item_health", NAME_HEALTH_MEDIUM );
@@ -1399,6 +1682,7 @@ void Register()
 	g_CustomEntityFuncs.RegisterCustomEntity( "q2items::item_q2grenadelauncher", "item_q2grenadelauncher" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "q2items::item_q2rocketlauncher", "item_q2rocketlauncher" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "q2items::item_q2hyperblaster", "item_q2hyperblaster" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "q2items::item_q2plasmabeam", "item_q2plasmabeam" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "q2items::item_q2railgun", "item_q2railgun" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "q2items::item_q2bfg", "item_q2bfg" );
 	g_Game.PrecacheOther( "item_q2shotgun" );
@@ -1408,8 +1692,12 @@ void Register()
 	g_Game.PrecacheOther( "item_q2grenadelauncher" );
 	g_Game.PrecacheOther( "item_q2rocketlauncher" );
 	g_Game.PrecacheOther( "item_q2hyperblaster" );
+	g_Game.PrecacheOther( "item_q2plasmabeam" );
 	g_Game.PrecacheOther( "item_q2railgun" );
 	g_Game.PrecacheOther( "item_q2bfg" );
+
+	g_CustomEntityFuncs.RegisterCustomEntity( "q2items::key_red_key", "key_red_key" );
+	g_Game.PrecacheOther( "key_red_key" );
 
 	g_CustomEntityFuncs.RegisterCustomEntity( "q2items::weapon_q2inventory", INVWEAP_NAME );
 	g_ItemRegistry.RegisterWeapon( INVWEAP_NAME, "quake2/items" );
@@ -1467,6 +1755,13 @@ void Register()
 	g_ItemRegistry.RegisterWeapon( PSHIELDWEAP_NAME, "quake2/items" );
 	g_Game.PrecacheOther( PSHIELDWEAP_NAME );
 	g_Game.PrecacheOther( PSHIELDITEM_NAME );
+
+	//N64
+	g_CustomEntityFuncs.RegisterCustomEntity( "q2items::item_invisibility", INVISITEM_NAME );
+	g_CustomEntityFuncs.RegisterCustomEntity( "q2items::weapon_q2invisibility", INVISWEAP_NAME );
+	g_ItemRegistry.RegisterWeapon( INVISWEAP_NAME, "quake2/items" );
+	g_Game.PrecacheOther( INVISWEAP_NAME );
+	g_Game.PrecacheOther( INVISITEM_NAME );
 }
 
 } //end of namespace q2items
@@ -1475,13 +1770,16 @@ void Register()
 */
 
 /* TODO
-	Add rerelease items
+	Add rerelease and DLC items
 
 	Make the armor pickups behave more like Quake 2 ?? (some math stuff)
+
 	Make the weapon-based items actual items that go in the Inventory ?? (nooooo :D)
 	Make the weapon-based items droppable ??
 	Consolidate the weapon-based items ??
+
 	Consolidate the Touch functions ??
+
 	Keep max ammo from bandolier/pack if a player dies ??
 
 
@@ -1492,6 +1790,8 @@ void Register()
 		Add effect to power screen ??
 
 	item_quad and the like
+		Automatically shift the HUD icons when activating more than one item, instead of hard-coding their positions ??
+
 		quad > quadfire > doubledmg > invul > invis > enviro > breather
 
 		Add screen fades ??
@@ -1505,4 +1805,9 @@ void Register()
 			G_AddBlend(0, 0, 1, 0.08f, ent->client->ps.screen_blend);
 
 		SV_AddBlend (0, 0, 1, 0.08, ent->client->ps.blend);
+
+
+	item_invisibility
+		Fade the player in and out instead of instantly applying EF_NODRAW
+		Shooting should cause the player to become slightly more visible temporarily
 */

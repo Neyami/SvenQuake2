@@ -126,8 +126,7 @@ class weapon_q2machinegun : CBaseQ2Weapon
 
 	void PrimaryAttack()
 	{
-		int ammo = m_pPlayer.m_rgAmmo( self.m_iPrimaryAmmoType );
-		if( ammo <= 0 )
+		if( m_pPlayer.m_rgAmmo(self.m_iPrimaryAmmoType) <= 0 )
 		{
 			self.PlayEmptySound();
 			self.m_flNextPrimaryAttack = g_Engine.time + 0.75;
@@ -135,9 +134,12 @@ class weapon_q2machinegun : CBaseQ2Weapon
 			return;
 		}
 
-		--ammo;
-		m_pPlayer.m_rgAmmo( self.m_iPrimaryAmmoType, ammo );
-		m_pPlayer.m_iWeaponVolume = LOUD_GUN_VOLUME;
+		G_RemoveAmmo( 1 );
+
+		//Quake 2 monsters aren't alerted to gunshots ??
+		if( q2::arrsQuake2Maps.find(g_Engine.mapname) < 0 )
+			m_pPlayer.m_iWeaponVolume = LOUD_GUN_VOLUME;
+
 		m_pPlayer.m_iWeaponFlash = BRIGHT_GUN_FLASH;
 		m_pPlayer.pev.effects |= EF_MUZZLEFLASH;
 		m_pPlayer.SetAnimation( PLAYER_ATTACK1 );
@@ -145,7 +147,9 @@ class weapon_q2machinegun : CBaseQ2Weapon
 		self.SendWeaponAnim( ANIM_SHOOT );
 
 		g_SoundSystem.EmitSound( m_pPlayer.edict(), CHAN_WEAPON, pQ2WSounds[Math.RandomLong(SND_SHOOT1, SND_SHOOT5)], GetSilencedVolume(VOL_NORM), ATTN_NORM );
-		GetSoundEntInstance().InsertSound( bits_SOUND_COMBAT, pev.origin, int(386 * GetSilencedVolume(1.0)), 3.0, self );
+
+		//if( q2::arrsQuake2Maps.find(g_Engine.mapname) < 0 )
+			//GetSoundEntInstance().InsertSound( bits_SOUND_COMBAT, pev.origin, int(386 * GetSilencedVolume(1.0)), 3.0, self );
 
 		Math.MakeVectors( m_pPlayer.pev.v_angle + m_pPlayer.pev.punchangle );
 		Vector vecMuzzle = m_pPlayer.GetGunPosition();
@@ -167,7 +171,7 @@ class weapon_q2machinegun : CBaseQ2Weapon
 			{
 				//ent->client->kick_origin[i] = crandom() * 0.35;
 				//ent->client->kick_angles[i] = crandom() * 0.7;
-				m_pPlayer.pev.punchangle[i] = crandom_open() * 0.7;
+				m_pPlayer.pev.punchangle[i] = q2::crandom() * 0.7;
 			}
 
 			//ent->client->kick_origin[0] = crandom() * 0.35;

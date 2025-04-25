@@ -1,6 +1,18 @@
 namespace q2
 {
 
+const string KVN_FOOTSTEP			= "$f_q2footstep";
+const string KVN_FOOTSTEP_LEFT	= "$i_q2footstepleft";
+const string KVN_FOOTSTEP_SKIP	= "$i_q2footstepskip";
+
+const int CHAR_TEX_ENERGY			= 40; //E
+const int CHAR_TEX_CARPET			= 41; //A
+
+const int STEP_ENERGY					= 40;
+const int STEP_CARPET					= 41;
+
+dictionary pQ2Textures;
+
 //from quake 2 rerelease
 Vector slerp( const Vector &in vecFrom, const Vector &in vecTo, float t )
 {
@@ -27,11 +39,8 @@ Vector slerp( const Vector &in vecFrom, const Vector &in vecTo, float t )
 }
 
 //from quake 2 rerelease
-void T_RadiusDamage( EHandle &in eInflictor, EHandle &in eAttacker, float flDamage, EHandle &in eIgnore, float flRadius, int bitsDamageType/*, mod_t mod*/ )
+void T_RadiusDamage( CBaseEntity@ pInflictor, CBaseEntity@ pAttacker, float flDamage, CBaseEntity@ pIgnore, float flRadius, int bitsDamageType, int mod = MOD_UNKNOWN )
 {
-	CBaseEntity@ pInflictor = eInflictor.GetEntity();
-	CBaseEntity@ pAttacker = eAttacker.GetEntity();
-	CBaseEntity@ pIgnore = eIgnore.GetEntity();
 	if( pIgnore is null ) @pIgnore = pInflictor;
 
 	float flPoints;
@@ -70,11 +79,11 @@ void T_RadiusDamage( EHandle &in eInflictor, EHandle &in eAttacker, float flDama
 
 		if( flPoints > 0 )
 		{
-			if( CanDamage(EHandle(pEnt), EHandle(pInflictor)) )
+			if( CanDamage(pEnt, pInflictor) )
 			{
 				vecDir = (pEnt.pev.origin - vecInflictorCenter).Normalize();
 
-				T_Damage( EHandle(pEnt), EHandle(pInflictor), EHandle(pAttacker), vecDir, closest_point_to_box(vecInflictorCenter, pEnt.pev.absmin, pEnt.pev.absmax), vecDir, flPoints, flPoints, bitsDamageType/* | DAMAGE_RADIUS, mod*/ );
+				T_Damage( pEnt, pInflictor, pAttacker, vecDir, closest_point_to_box(vecInflictorCenter, pEnt.pev.absmin, pEnt.pev.absmax), vecDir, flPoints, flPoints, bitsDamageType/* | DAMAGE_RADIUS*/, mod );
 				//if( !((pEnt.pev.FlagBitSet(FL_CLIENT) and pEnt !is pAttacker) and !q2::PVP) ) //deals damage to players otherwise
 					//pEnt.TakeDamage( pInflictor.pev, pAttacker.pev, flPoints, bitsDamageType );
 			}
@@ -83,69 +92,67 @@ void T_RadiusDamage( EHandle &in eInflictor, EHandle &in eAttacker, float flDama
 }
 
 //from quake 2
-void T_Damage( EHandle &in eTarget, EHandle &in eInflictor, EHandle &in eAttacker, Vector vecDir, Vector vecPoint, Vector vecNormal, float flDamage, float flKnockback, int bitsDamageType/*, int mod*/ )
+void T_Damage( CBaseEntity@ pTarget, CBaseEntity@ pInflictor, CBaseEntity@ pAttacker, Vector vecDir, Vector vecPoint, Vector vecNormal, float flDamage, float flKnockback, int bitsDamageType, int mod = MOD_UNKNOWN )
 {
-	CBaseEntity@ pTarget = eTarget.GetEntity();
-	CBaseEntity@ pInflictor = eInflictor.GetEntity();
-	CBaseEntity@ pAttacker = eAttacker.GetEntity();
+	if( pTarget.pev.takedamage == DAMAGE_NO )
+		return;
 
-	//gclient_t	*client;
 	float flTake;
 	float flSave;
 	float flAsave;
 	float flPsave;
 	//int te_sparks;
 
-	if( pTarget.pev.takedamage == DAMAGE_NO )
-		return;
-
 	// friendly fire avoidance
 	// if enabled you can't hurt teammates (but you can hurt yourself)
-	if( pTarget !is pAttacker and pTarget.pev.FlagBitSet(FL_CLIENT) and !q2::PVP )
+	if( pAttacker !is null and pAttacker.pev.FlagBitSet(FL_CLIENT) )
 	{
-		flDamage = 0.0;
-		flKnockback = 0.0;
+		if( pTarget !is pAttacker and pTarget.pev.FlagBitSet(FL_CLIENT) and !q2::PVP )
+		{
+			flDamage = 0.0;
+			flKnockback = 0.0;
+		}
 	}
-/*
-	meansOfDeath = mod;
+
+	//meansOfDeath = mod;
 
 	// easy mode takes half damage
-	if( skill.value == 0 and deathmatch.value == 0 and pTarget.pev.FlagBitSet(FL_CLIENT) )
+	if( q2npc::g_iDifficulty == q2npc::DIFF_EASY and !q2::PVP and pTarget.pev.FlagBitSet(FL_CLIENT) )
 	{
 		flDamage *= 0.5;
 		if( flDamage <= 0.0 )
 			flDamage = 1.0;
 	}
-
-	client = pTarget.client;
-
+/*
 	if( (bitsDamageType & DAMAGE_BULLET) != 0 )
 		te_sparks = TE_BULLET_SPARKS;
 	else
 		te_sparks = TE_SPARKS;*/
 
-	//VectorNormalize(vecDir);
 	vecDir = vecDir.Normalize();
 /*
 // bonus damage for suprising a monster
-	if( !(bitsDamageType & DAMAGE_RADIUS) and (pTarget.svflags & SVF_MONSTER) and (pAttacker.client) and (!pTarget.enemy) and (pTarget.health > 0) )
+	if( !(bitsDamageType & DAMAGE_RADIUS) and (pTarget.svflags & SVF_MONSTER) and pAttacker.pev.FlagBitSet(FL_CLIENT) and (!pTarget.enemy) and pTarget.pev.health > 0 )
 		flDamage *= 2.0;
 
 	if( pTarget.flags & FL_NO_KNOCKBACK )
 		flKnockback = 0.0;
 */
 	//figure momentum add
-	//if( (bitsDamageType & DAMAGE_NO_KNOCKBACK) == 0 )
+	if( (bitsDamageType & DMG_LAUNCH) != 0 )
 	{
+		bitsDamageType &= ~DMG_LAUNCH;
+
 		if( flKnockback > 0.0 and pTarget.pev.movetype != MOVETYPE_NONE and pTarget.pev.movetype != MOVETYPE_BOUNCE and pTarget.pev.movetype != MOVETYPE_PUSH/* and (pTarget.movetype != MOVETYPE_STOP)*/ )
 		{
 			Vector vecKvel;
 			float flMass = 200; //player
 
-			/*if (pTarget.mass < 50)
+			float flTargetMass = GetMassForTarget( pTarget, 200, 50, 2000 );
+			if( flTargetMass < 50 )
 				flMass = 50;
 			else
-				flMass = pTarget.mass;*/
+				flMass = flTargetMass;
 
 			if( pTarget.pev.FlagBitSet(FL_CLIENT) and pAttacker is pTarget )
 				vecKvel = vecDir * (1600.0 * flKnockback / flMass); //rocket jump hack
@@ -184,14 +191,21 @@ void T_Damage( EHandle &in eTarget, EHandle &in eInflictor, EHandle &in eAttacke
 		else
 			SpawnDamage (te_sparks, vecPoint, vecNormal, flTake);*/
 
+		if( pTarget !is null )
+		{
+			CustomKeyvalues@ pCustom = pTarget.GetCustomKeyvalues();
+			pCustom.SetKeyvalue( KVN_MOD, mod );
+			//g_Game.AlertMessage( at_notice, "MODE OF DEATH SET TO %1\n", mod );
+		}
+
 		//this works with the custom death messages
 		entvars_t@ entAttacker;
-		if( entAttacker is null )
+		if( pAttacker is null )
 			@entAttacker = pInflictor.pev;
 		else
 			@entAttacker = pAttacker.pev;
 
-		pTarget.TakeDamage( pInflictor.pev, entAttacker, flTake, 0 ); //bitsDamageType
+		pTarget.TakeDamage( pInflictor.pev, entAttacker, flTake, bitsDamageType ); //bitsDamageType
 
 		//this doesn't
 		/*pTarget.pev.health = pTarget.pev.health - flTake;
@@ -204,14 +218,38 @@ void T_Damage( EHandle &in eTarget, EHandle &in eInflictor, EHandle &in eAttacke
 			//Killed( pTarget, pInflictor, pAttacker, flTake, vecPoint );
 		}*/
 	}
+
+/*
+	if (targ->svflags & SVF_MONSTER)
+	{
+		M_ReactToDamage (targ, attacker);
+		if (!(targ->monsterinfo.aiflags & AI_DUCKED) && (take))
+		{
+			targ->pain (targ, attacker, knockback, take);
+			// nightmare mode monsters don't go into pain frames often
+			if (skill->value == 3)
+				targ->pain_debounce_time = level.time + 5;
+		}
+	}
+*/
+}
+
+float GetMassForTarget( CBaseEntity@ pTarget, float flBaseScale, float flMinScale, float flMaxScale, float flScaleIncrease = 0.4, float flScaleDecrease = 1.5 )
+{
+	float flBaseMobVolume = 73728; //player size
+	float flScale;
+
+	float flMobVolume = (pTarget.pev.size.x * pTarget.pev.size.y * pTarget.pev.size.z);
+	if( flMobVolume > flBaseMobVolume ) flScale = (flBaseScale * (flMobVolume/flBaseMobVolume)) * flScaleIncrease;
+	else if( flMobVolume < flBaseMobVolume ) flScale = (flBaseScale / (flBaseMobVolume/flMobVolume)) * flScaleDecrease;
+	else flScale = flBaseScale;
+
+	return Math.clamp( flMinScale, flMaxScale, flScale );
 }
 
 //from quake 2 rerelease
-bool CanDamage( EHandle &in eTarget, EHandle &in eInflictor )
+bool CanDamage( CBaseEntity@ pTarget, CBaseEntity@ pInflictor )
 {
-	CBaseEntity@ pTarget = eTarget.GetEntity();
-	CBaseEntity@ pInflictor = eInflictor.GetEntity();
-
 	Vector vecDest;
 	TraceResult trace;
 
@@ -219,9 +257,10 @@ bool CanDamage( EHandle &in eTarget, EHandle &in eInflictor )
 	Vector vecIinflictorCenter;
 
 	//if( pInflictor.linked )
+	if( pInflictor.pev.solid == SOLID_BSP )
 		vecIinflictorCenter = (pInflictor.pev.absmin + pInflictor.pev.absmax) * 0.5;
-	//else
-		//vecIinflictorCenter = pInflictor.pev.origin;
+	else
+		vecIinflictorCenter = pInflictor.pev.origin;
 
 	if( pTarget.pev.solid == SOLID_BSP )
 	{
@@ -280,9 +319,8 @@ bool CanDamage( EHandle &in eTarget, EHandle &in eInflictor )
 }
 
 //from quake 2
-float CheckPowerArmor( EHandle &in eEnt, Vector vecPoint, Vector vecNormal, float flDamage, int bitsDamageType )
+float CheckPowerArmor( CBaseEntity@ pEnt, Vector vecPoint, Vector vecNormal, float flDamage, int bitsDamageType )
 {
-	CBaseEntity@ pEnt = eEnt.GetEntity();
 	float flSave;
 	int iPowerArmorType;
 	int iDamagePerCell;
@@ -302,19 +340,19 @@ float CheckPowerArmor( EHandle &in eEnt, Vector vecPoint, Vector vecNormal, floa
 	{
 		iPowerArmorType = PowerArmorType( pPlayer );
 
-		if( iPowerArmorType != q2items::POWER_ARMOR_NONE )
+		if( iPowerArmorType != q2::POWER_ARMOR_NONE )
 			iPower = pPlayer.m_rgAmmo( g_PlayerFuncs.GetAmmoIndex("q2cells") );
 	}
 	else
 		return 0;
 
-	if( iPowerArmorType == q2items::POWER_ARMOR_NONE )
+	if( iPowerArmorType == q2::POWER_ARMOR_NONE )
 		return 0;
 
 	if( iPower <= 0 )
 		return 0;
 
-	if( iPowerArmorType == q2items::POWER_ARMOR_SCREEN )
+	if( iPowerArmorType == q2::POWER_ARMOR_SCREEN )
 	{
 		Vector vecDir;
 		float flDot;
@@ -390,7 +428,7 @@ float CheckPowerArmor( EHandle &in eEnt, Vector vecPoint, Vector vecNormal, floa
 	iPower = Math.max( 0, iPower - Math.max(iDamagePerCell, iPowerUsed) );
 
 	// check power armor turn-off states
-	G_CheckPowerArmor( eEnt );
+	G_CheckPowerArmor( pEnt );
 
 	return flSave;
 }
@@ -399,27 +437,26 @@ float CheckPowerArmor( EHandle &in eEnt, Vector vecPoint, Vector vecNormal, floa
 int PowerArmorType( CBasePlayer@ pPlayer )
 {
 	if( pPlayer is null or !pPlayer.IsAlive() )
-		return q2items::POWER_ARMOR_NONE;
+		return q2::POWER_ARMOR_NONE;
 
 	CustomKeyvalues@ pCustom = pPlayer.GetCustomKeyvalues();
 
 	if( !pCustom.GetKeyvalue(q2items::PARMOR_KVN).Exists() )
-		return q2items::POWER_ARMOR_NONE;
+		return q2::POWER_ARMOR_NONE;
 
 	//just return q2items::PARMOR_KVN ??
-	if( pCustom.GetKeyvalue(q2items::PARMOR_KVN).GetInteger() == q2items::POWER_ARMOR_SHIELD )
-		return q2items::POWER_ARMOR_SHIELD;
+	if( pCustom.GetKeyvalue(q2items::PARMOR_KVN).GetInteger() == q2::POWER_ARMOR_SHIELD )
+		return q2::POWER_ARMOR_SHIELD;
 
-	if( pCustom.GetKeyvalue(q2items::PARMOR_KVN).GetInteger() == q2items::POWER_ARMOR_SCREEN )
-		return q2items::POWER_ARMOR_SCREEN;
+	if( pCustom.GetKeyvalue(q2items::PARMOR_KVN).GetInteger() == q2::POWER_ARMOR_SCREEN )
+		return q2::POWER_ARMOR_SCREEN;
 
-	return q2items::POWER_ARMOR_NONE;
+	return q2::POWER_ARMOR_NONE;
 }
 
 //from quake 2
-float CheckArmor( EHandle &in eEnt, Vector vecPoint, Vector vecNormal, float flDamage )
+float CheckArmor( CBaseEntity@ pEnt, Vector vecPoint, Vector vecNormal, float flDamage )
 {
-	CBaseEntity@ pEnt = eEnt.GetEntity();
 	float flSave;
 
 	if( flDamage <= 0.0 )
@@ -447,9 +484,9 @@ float CheckArmor( EHandle &in eEnt, Vector vecPoint, Vector vecNormal, float flD
 }
 
 //from quake 2 rerelease
-void G_CheckPowerArmor( EHandle &in eEnt )
+void G_CheckPowerArmor( CBaseEntity@ pEnt )
 {
-	CBasePlayer@ pPlayer = cast<CBasePlayer@>(eEnt.GetEntity());
+	CBasePlayer@ pPlayer = cast<CBasePlayer@>( pEnt );
 	if( pPlayer is null ) return;
 
 	q2items::UpdatePowerArmorHUD( pPlayer );
@@ -459,7 +496,7 @@ void G_CheckPowerArmor( EHandle &in eEnt )
 	if( pPlayer.m_rgAmmo(g_PlayerFuncs.GetAmmoIndex("q2cells")) <= 0)
 		bHasEnoughCells = false;
 	//else if (pEnt->client->pers.autoshield >= AUTO_SHIELD_AUTO)
-		//bHasEnoughCells = (pEnt->flags & FL_WANTS_POWER_ARMOR) && pEnt->client->pers.inventory[IT_AMMO_CELLS] > pEnt->client->pers.autoshield;
+		//bHasEnoughCells = (pEnt->flags & FL_WANTS_POWER_ARMOR) and pEnt->client->pers.inventory[IT_AMMO_CELLS] > pEnt->client->pers.autoshield;
 	else
 		bHasEnoughCells = true;
 
@@ -476,8 +513,8 @@ void G_CheckPowerArmor( EHandle &in eEnt )
 	/*else
 	{
 		// special case for power armor, for auto-shields
-		if (pEnt->client->pers.autoshield != AUTO_SHIELD_MANUAL &&
-			bHasEnoughCells && (pEnt->client->pers.inventory[IT_ITEM_POWER_SCREEN] ||
+		if (pEnt->client->pers.autoshield != AUTO_SHIELD_MANUAL and
+			bHasEnoughCells and (pEnt->client->pers.inventory[IT_ITEM_POWER_SCREEN] or
 				pEnt->client->pers.inventory[IT_ITEM_POWER_SHIELD]))
 		{
 			pEnt->flags |= FL_POWER_ARMOR;
@@ -496,6 +533,596 @@ Vector closest_point_to_box( const Vector &in from, const Vector &in absmins, co
 	);
 }
 
+void PM_UpdateStepSound( CBasePlayer@ pPlayer )
+{
+	bool bWalking;
+	float fvol;
+	float flSpeed;
+	float flVelRun;
+	float flVelWalk;
+	float flDuck;
+	bool bLadder;
+	int iStep;
+
+	CustomKeyvalues@ pCustom = pPlayer.GetCustomKeyvalues();
+	float flTimeStepSound = pCustom.GetKeyvalue( KVN_FOOTSTEP ).GetFloat();
+
+	if( flTimeStepSound > g_Engine.time )
+		return;
+
+	if( pPlayer.pev.FlagBitSet(FL_FROZEN) )
+		return;
+
+	//PM_CatagorizeTextureType();
+
+	flSpeed = pPlayer.pev.velocity.Length();
+
+	bLadder = ( pPlayer.pev.movetype == MOVETYPE_FLY );// IsOnLadder();
+
+	if( pPlayer.pev.FlagBitSet(FL_DUCKING) or bLadder )
+	{
+		flVelWalk = 60;
+		flVelRun = 80;
+		flDuck = 0.1; //100
+	}
+	else
+	{
+		flVelWalk = 80; //120
+		flVelRun = 210;
+		flDuck = 0.0;
+	}
+
+	// If we're on a ladder or on the ground, and we're moving fast enough,
+	//  play step sound.  Also, if flTimeStepSound is zero, get the new
+	//  sound right away - we just started moving in new level.
+	if( (bLadder or pPlayer.pev.FlagBitSet(FL_ONGROUND)) and pPlayer.pev.velocity.Length() > 0.0 and (flSpeed >= flVelWalk or flTimeStepSound <= 0.0) )
+	{
+		bWalking = flSpeed < flVelRun;
+
+		// find out what we're stepping in or on...
+		if( bLadder )
+		{
+			iStep = STEP_LADDER;
+			fvol = 0.35;
+			flTimeStepSound = 0.35; //350
+		}
+		else if( pPlayer.pev.waterlevel >= WATERLEVEL_WAIST )
+		{
+			iStep = STEP_WADE;
+			fvol = 0.65;
+			flTimeStepSound = 0.6; //600
+		}
+		else if( pPlayer.pev.waterlevel == WATERLEVEL_FEET )
+		{
+			iStep = STEP_SLOSH;
+			fvol = bWalking ? 0.2 : 0.5;
+			flTimeStepSound = bWalking ? 0.4 : 0.3; //400 : 300
+		}
+		else
+		{
+			iStep = MapTextureTypeStepType( CatagorizeTextureType(pPlayer) );
+
+			switch( iStep )
+			{
+				case CHAR_TEX_WOOD:
+				case CHAR_TEX_FLESH:
+				case CHAR_TEX_SNOW:
+				case CHAR_TEX_DIRT:
+				{
+					fvol = bWalking ? 0.25 : 0.55;
+					flTimeStepSound = bWalking ? 0.4 : 0.3; //400 : 300
+					break;
+				}
+
+				case CHAR_TEX_VENT:
+				{
+					fvol = bWalking ? 0.4 : 0.7;
+					flTimeStepSound = bWalking ? 0.4 : 0.3; //400 : 300
+					break;
+				}
+
+				case CHAR_TEX_METAL:
+				case CHAR_TEX_GRATE:
+				case CHAR_TEX_TILE:
+				case CHAR_TEX_SLOSH:
+				case CHAR_TEX_CARPET:
+				case CHAR_TEX_ENERGY:
+				case CHAR_TEX_CONCRETE:
+				default:
+				{
+					fvol = bWalking ? 0.2 : 0.5;
+					flTimeStepSound = bWalking ? 0.4 : 0.3; //400 : 300
+					break;
+				}
+			}
+		}
+		
+		flTimeStepSound += flDuck; // slower step time if ducking
+		pCustom.SetKeyvalue( KVN_FOOTSTEP, g_Engine.time + flTimeStepSound );
+
+		if( pPlayer.pev.FlagBitSet(FL_DUCKING) )
+			fvol *= 0.35;
+
+		PM_PlayStepSound( pPlayer, iStep, fvol );
+	}
+}
+
+char CatagorizeTextureType( CBasePlayer@ pPlayer )
+{
+	Vector vecOrigin = pPlayer.pev.origin;
+
+	TraceResult tr;
+	g_Utility.TraceLine( vecOrigin, vecOrigin + Vector(0, 0, -64),  ignore_monsters, pPlayer.edict(), tr );
+
+	edict_t@ pWorld = g_EntityFuncs.Instance(0).edict();
+	if( tr.pHit !is null ) @pWorld = tr.pHit;
+
+	string sTexture = g_Utility.TraceTexture( pWorld, vecOrigin, vecOrigin + Vector(0, 0, -64) );
+
+	if( q2::pQ2Textures.exists(sTexture.ToLowercase()) )
+		return string( pQ2Textures[sTexture] );
+
+	return g_SoundSystem.FindMaterialType( sTexture );
+}
+
+void PM_PlayStepSound( CBasePlayer@ pPlayer, int iStep, float flVol )
+{
+	CustomKeyvalues@ pCustom = pPlayer.GetCustomKeyvalues();
+
+	int iSkipStep = 0;
+	int iRand;
+	Vector hvel;
+
+	int iStepLeft = pCustom.GetKeyvalue( KVN_FOOTSTEP_LEFT ).GetInteger();
+	if( iStepLeft == 0 ) pCustom.SetKeyvalue( KVN_FOOTSTEP_LEFT, 1 );
+		else pCustom.SetKeyvalue( KVN_FOOTSTEP_LEFT, 0 );
+
+	iRand = Math.RandomLong(0, 1) + (iStepLeft * 2);
+
+	hvel = pPlayer.pev.velocity;
+	hvel.z = 0.0;
+
+	//if ( pmove->multiplayer and (!g_onladder && hvel.Length() <= 220) )
+		//return;
+
+	// irand - 0,1 for right foot, 2,3 for left foot
+	// used to alternate left and right foot
+	switch( iStep )
+	{
+		case STEP_METAL:
+		{
+			switch( iRand )
+			{
+				// right foot
+				case 0:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/clank1.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 1:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/clank3.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				// left foot
+				case 2:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/clank2.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 3:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/clank4.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+			}
+
+			break;
+		}
+
+		case STEP_DIRT:
+		{
+			switch( iRand )
+			{
+				// right foot
+				case 0:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/grass1.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 1:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/grass3.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				// left foot
+				case 2:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/grass2.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 3:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/grass4.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+			}
+
+			break;
+		}
+
+		case STEP_VENT:
+		{
+			switch( iRand )
+			{
+				// right foot
+				case 0:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/boot1.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 1:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/boot3.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				// left foot
+				case 2:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/boot2.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 3:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/boot4.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+			}
+
+			break;
+		}
+
+		case STEP_GRATE:
+		{
+			switch( iRand )
+			{
+				// right foot
+				case 0:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/mech1.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 1:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/mech3.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				// left foot
+				case 2:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/mech2.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 3:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/mech4.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+			}
+
+			break;
+		}
+
+		case STEP_TILE:
+		{
+			switch( iRand )
+			{
+				// right foot
+				case 0:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/tile1.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 1:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/tile3.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				// left foot
+				case 2:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/tile2.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 3:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/tile4.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+			}
+
+			break;
+		}
+
+		case STEP_SLOSH:
+		{
+			switch( iRand )
+			{
+				// right foot
+				case 0:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/splash1.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 1:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/splash3.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				// left foot
+				case 2:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/splash2.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 3:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/splash4.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+			}
+
+			break;
+		}
+
+		case STEP_WADE:
+		{
+			iSkipStep = pCustom.GetKeyvalue( KVN_FOOTSTEP_SKIP ).GetInteger();
+
+			if( iSkipStep == 0 )
+			{
+				iSkipStep++;
+				pCustom.SetKeyvalue( KVN_FOOTSTEP_SKIP, iSkipStep );
+				break;
+			}
+
+			if( iSkipStep++ == 3 ) //??
+				iSkipStep = 0;
+
+			pCustom.SetKeyvalue( KVN_FOOTSTEP_SKIP, iSkipStep );
+
+			switch( iRand )
+			{
+				// right foot
+				case 0:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/wade1.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 1:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/wade2.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				// left foot
+				case 2:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/wade3.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 3:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/wade1.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+			}
+
+			break;
+		}
+
+		case STEP_LADDER:
+		{
+			if( g_PlayerFuncs.SharedRandomLong(pPlayer.random_seed, 0, 4) == 0 )
+				iRand = 4;
+
+			switch( iRand )
+			{
+				// right foot
+				case 0:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/ladder1.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 1:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/ladder3.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				// left foot
+				case 2:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/ladder2.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 3:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/ladder4.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 4:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/ladder5.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+			}
+
+			break;
+		}
+
+		case STEP_WOOD:
+		{
+			if( g_PlayerFuncs.SharedRandomLong(pPlayer.random_seed, 0, 4) == 0 )
+				iRand = 4;
+
+			switch( iRand )
+			{
+				// right foot
+				case 0:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/wood1.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 1:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/wood3.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				// left foot
+				case 2:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/wood2.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 3:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/wood4.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 4:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/wood5.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+			}
+
+			break;
+		}
+
+		case STEP_FLESH:
+		{
+			if( g_PlayerFuncs.SharedRandomLong(pPlayer.random_seed, 0, 4) == 0 )
+				iRand = 4;
+
+			switch( iRand )
+			{
+				// right foot
+				case 0:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/meat1.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 1:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/meat3.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				// left foot
+				case 2:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/meat2.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 3:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/meat4.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 4:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/meat5.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+			}
+
+			break;
+		}
+
+		case STEP_SNOW:
+		{
+			switch( iRand )
+			{
+				// right foot
+				case 0:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/snow1.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 1:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/snow3.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				// left foot
+				case 2:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/snow2.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 3:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/snow4.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+			}
+
+			break;
+		}
+
+		case STEP_ENERGY:
+		{
+			switch( iRand )
+			{
+				// right foot
+				case 0:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/energy1.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 1:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/energy3.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				// left foot
+				case 2:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/energy2.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 3:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/energy4.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+			}
+
+			break;
+		}
+
+		case STEP_CARPET:
+		{
+			switch( iRand )
+			{
+				// right foot
+				case 0:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/carpet1.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 1:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/carpet3.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				// left foot
+				case 2:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/carpet2.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 3:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/carpet4.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+			}
+
+			break;
+		}
+
+		case STEP_CONCRETE:
+		default:
+		{
+			switch( iRand )
+			{
+				// right foot
+				case 0:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/step1.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 1:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/step3.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				// left foot
+				case 2:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/step2.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+				case 3:	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_BODY, "quake2/player/steps/step4.wav", flVol, ATTN_NORM, 0, PITCH_NORM );	break;
+			}
+
+			break;
+		}
+	}
+
+	//g_Game.AlertMessage( at_notice, "sTexture: %1\n", sTexture );
+	//g_Game.AlertMessage( at_notice, "chTextureType: %1\n", string(chTextureType) );
+	//g_Game.AlertMessage( at_notice, "iStep: %1\n", iStep );
+}
+
+int MapTextureTypeStepType( char chTextureType )
+{
+	if( chTextureType == 'C' ) return STEP_CONCRETE;
+	else if( chTextureType == 'M' ) return STEP_METAL;
+	else if( chTextureType == 'D' ) return STEP_DIRT;
+	else if( chTextureType == 'V' ) return STEP_VENT;
+	else if( chTextureType == 'G' ) return STEP_GRATE;
+	else if( chTextureType == 'T' ) return STEP_TILE;
+	else if( chTextureType == 'S' ) return STEP_SLOSH;
+	else if( chTextureType == 'W' ) return STEP_WOOD;
+	else if( chTextureType == 'F' ) return STEP_FLESH;
+	else if( chTextureType == 'O' ) return STEP_SNOW;
+	else if( chTextureType == 'E' ) return STEP_ENERGY;
+	else if( chTextureType == 'A' ) return STEP_CARPET;
+
+	return STEP_CONCRETE;
+}
+
+//from quake 2
+void ThrowGib( CBaseEntity@ pEntity, int iCount, const string &in sGibName, float flDamage, int iBone = -1, int iType = 0, int iSkin = 0 )
+{
+	float vscale;
+
+	for( int i = 0; i < iCount; i++ )
+	{
+		CGib@ pGib = g_EntityFuncs.CreateGib( pEntity.pev.origin, g_vecZero );
+		pGib.Spawn( sGibName );
+		pGib.pev.skin = iSkin;
+		pGib.pev.scale = pEntity.pev.scale;
+
+		if( iBone >= 0 )
+		{
+			Vector vecBonePos;
+			g_EngineFuncs.GetBonePosition( pEntity.edict(), iBone, vecBonePos, void );
+			g_EntityFuncs.SetOrigin( pGib, vecBonePos );
+		}
+		else
+		{
+			Vector vecSize = pEntity.pev.size * 0.5;
+			// since absmin is bloated by 1, un-bloat it here
+			Vector vecOrigin = (pEntity.pev.absmin + Vector(1.0, 1.0, 1.0)) + vecSize;
+
+			int i;
+
+			for( i = 0; i < 3; i++ )
+			{
+				Vector vecRandom( crandom()*vecSize.x, crandom()*vecSize.y, crandom()*vecSize.z );
+				pGib.pev.origin = vecOrigin + vecRandom; //Vector(crandom(), crandom(), crandom()).scaled(vecSize);
+				g_EntityFuncs.SetOrigin( pGib, pGib.pev.origin );
+
+				// try 3 times to get a good, non-solid position
+				if( g_EngineFuncs.PointContents(pGib.pev.origin) != CONTENTS_SOLID )
+					break;
+				//if (!(gi.pointcontents(gib->s.origin) & MASK_SOLID))
+					//break;
+			}
+		}
+
+		if( (iType & GIB_METALLIC) == 0 )
+		{
+			//pGib.pev.movetype = MOVETYPE_TOSS;
+			vscale = (iType & GIB_ACID) != 0 ? 3.0 : 0.5;
+		}
+		else
+		{
+			//pGib.pev.movetype = MOVETYPE_BOUNCE;
+			vscale = 1.0;
+		}
+
+		if( (iType & GIB_DEBRIS) != 0 )
+		{
+			Vector v;
+			v.x = 100 * crandom();
+			v.y = 100 * crandom();
+			v.z = 100 + 100 * crandom();
+			pGib.pev.velocity = pEntity.pev.velocity + (v * flDamage);
+		}
+		else
+		{
+			Vector vd = VelocityForDamage( flDamage );
+			pGib.pev.velocity = pEntity.pev.velocity + (vd * vscale);
+			ClipGibVelocity( pGib );
+		}
+
+		/*if (type & GIB_UPRIGHT)
+		{
+			gib->touch = gib_touch;
+			gib->flags |= FL_ALWAYS_TOUCH;
+		}*/
+
+		pGib.pev.avelocity.x = Math.RandomFloat( 0, 600 );
+		pGib.pev.avelocity.y = Math.RandomFloat( 0, 600 );
+		pGib.pev.avelocity.z = Math.RandomFloat( 0, 600 );
+
+		pGib.pev.angles.x = Math.RandomFloat( 0, 359 );
+		pGib.pev.angles.y = Math.RandomFloat( 0, 359 );
+		pGib.pev.angles.z = Math.RandomFloat( 0, 359 );
+
+		if( iType == BREAK_FLESH )
+		{
+			pGib.m_bloodColor = BLOOD_COLOR_RED;
+			pGib.m_cBloodDecals = 5;
+			pGib.m_material = matFlesh;
+			g_WeaponFuncs.SpawnBlood( pGib.pev.origin, BLOOD_COLOR_RED, 400 );
+		}
+		else
+			pGib.m_bloodColor = DONT_BLEED;
+	}
+}
+
+Vector VelocityForDamage( float flDamage )
+{
+	Vector v;
+
+	v.x = 100.0 * crandom_open(); //crandom()
+	v.y = 100.0 * crandom_open(); //crandom()
+	v.z = Math.RandomFloat( 200.0, 300.0 );
+
+	if( flDamage < 50 )
+		return v * 0.7;
+	else
+		return v * 1.2;
+}
+
+//from Quake 2
+/*
+=================
+KillBox
+
+Kills all entities that would touch the proposed new positioning
+of ent.  Ent should be unlinked before calling this!
+=================
+*/
+bool KillBox( CBaseEntity@ pEntity )
+{
+	TraceResult tr;
+
+	while( true )
+	{
+		//tr = gi.trace (ent->s.origin, ent->mins, ent->maxs, ent->s.origin, NULL, MASK_PLAYERSOLID);
+		g_Utility.TraceMonsterHull( pEntity.edict(), pEntity.pev.origin, pEntity.pev.origin, dont_ignore_monsters, pEntity.edict(), tr );
+
+		if( tr.pHit is null )
+			break;
+
+		// nail it
+		q2::T_Damage( g_EntityFuncs.Instance(tr.pHit), pEntity, pEntity, g_vecZero, pEntity.pev.origin, g_vecZero, 100000, 0, DMG_CRUSH | DMG_ALWAYSGIB ); //DAMAGE_NO_PROTECTION, MOD_TELEFRAG
+		//g_EntityFuncs.Instance(tr.pHit).TakeDamage( pEntity.pev, pEntity.pev, 100000, DMG_CRUSH | DMG_ALWAYSGIB );
+
+		// if we didn't kill it, fail
+		//if( tr.ent->solid )
+		if( tr.pHit.vars.deadflag == DEAD_NO )
+			return false;
+	}
+
+	return true;		// all clear
+}
+
+/*
+//From Half-Life
+Vector VelocityForDamage( float flDamage )
+{
+	Vector vec( Math.RandomFloat(-200, 200), Math.RandomFloat(-200, 200), Math.RandomFloat(300, 400) );
+
+	if( flDamage > 50 )
+		vec = vec * 0.7;
+	else if( flDamage > 200 )
+		vec = vec * 2;
+	else
+		vec = vec * 10;
+
+	return vec;
+}*/
+
+void ClipGibVelocity( CBaseEntity@ ent )
+{
+	if( ent.pev.velocity.x < -300 )
+		ent.pev.velocity.x = -300;
+	else if( ent.pev.velocity.x > 300 )
+		ent.pev.velocity.x = 300;
+
+	if( ent.pev.velocity.y < -300 )
+		ent.pev.velocity.y = -300;
+	else if( ent.pev.velocity.y > 300 )
+		ent.pev.velocity.y = 300;
+
+	if( ent.pev.velocity.z < 200 )
+		ent.pev.velocity.z = 200; //always some upwards
+	else if( ent.pev.velocity.z > 500 )
+		ent.pev.velocity.z = 500;
+} 
 /*
 inline void G_AddBlend(float r, float g, float b, float a, std::array<float, 4> &v_blend)
 {
@@ -505,9 +1132,9 @@ inline void G_AddBlend(float r, float g, float b, float a, std::array<float, 4> 
 	float a2 = v_blend[3] + (1 - v_blend[3]) * a; // new total alpha
 	float a3 = v_blend[3] / a2;					// fraction of color from old
 
-	v_blend[0] = v_blend[0] * a3 + r * (1 - a3);
-	v_blend[1] = v_blend[1] * a3 + g * (1 - a3);
-	v_blend[2] = v_blend[2] * a3 + b * (1 - a3);
+	v_blend.x = v_blend.x * a3 + r * (1 - a3);
+	v_blend.y = v_blend.y * a3 + g * (1 - a3);
+	v_blend.z = v_blend.z * a3 + b * (1 - a3);
 	v_blend[3] = a2;
 }
 
@@ -520,10 +1147,56 @@ void SV_AddBlend (float r, float g, float b, float a, float *v_blend)
 	a2 = v_blend[3] + (1-v_blend[3])*a;	// new total alpha
 	a3 = v_blend[3]/a2;		// fraction of color from old
 
-	v_blend[0] = v_blend[0]*a3 + r*(1-a3);
-	v_blend[1] = v_blend[1]*a3 + g*(1-a3);
-	v_blend[2] = v_blend[2]*a3 + b*(1-a3);
+	v_blend.x = v_blend.x*a3 + r*(1-a3);
+	v_blend.y = v_blend.y*a3 + g*(1-a3);
+	v_blend.z = v_blend.z*a3 + b*(1-a3);
 	v_blend[3] = a2;
 }
+*/
+
+float crandom()
+{
+	float flRandom = Math.RandomFloat( 0.0, 1.0 );
+	return (flRandom - 0.5) * 2.0;
+	//return Math.RandomFloat( -1.0, 1.0 );
+}
+
+float crandom_open()
+{
+	float flRandom = Math.RandomFloat( 0.0, 1.0 );
+
+	// Scale and shift to match the range [-1.0, 1.0)
+	return (flRandom - 0.5) * 2.0;
+}
+
+/*
+//??
+float crandom_open()
+{
+	float flRandom;
+
+	do
+	{
+		flRandom = Math.RandomFloat( -1.0, 1.0 );
+	} while( flRandom == -1.0 or flRandom == 1.0 ); // Reject boundary values
+
+	return flRandom;
+}
+*/
+//I can't figure these out :aRage:
+/*
+// uniform float [-1, 1)
+// note: closed on min but not max
+// to match vanilla behavior
+[[nodiscard]] inline float crandom()
+{
+	return std::uniform_real_distribution<float>(-1.f, 1.f)(mt_rand);
+}
+
+// uniform float (-1, 1)
+[[nodiscard]] inline float crandom_open()
+{
+	return std::uniform_real_distribution<float>(std::nextafterf(-1.f, 0.f), 1.f)(mt_rand);
+} 
 */
 } //end of namespace q2

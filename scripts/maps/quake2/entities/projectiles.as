@@ -58,7 +58,7 @@ class q2laser : ScriptBaseEntity
 	{
 		@m_pGlow = g_EntityFuncs.CreateSprite( "sprites/blueflare1.spr", pev.origin, false ); 
 		m_pGlow.SetTransparency( 3, 50, 20, 0, 255, 14 );
-		m_pGlow.SetScale( (pev.weapons == 1) ? 0.125 : 0.5 );
+		m_pGlow.SetScale( (pev.weapons == q2::MOD_HYPERBLASTER) ? 0.125 : 0.5 );
 		m_pGlow.SetAttachment( self.edict(), 0 );
 
 		g_SoundSystem.EmitSoundDyn( self.edict(), CHAN_VOICE, "quake2/misc/lasfly.wav", 0.05, ATTN_NORM, SND_FORCE_LOOP );
@@ -83,7 +83,7 @@ class q2laser : ScriptBaseEntity
 			m1.WriteByte( 128 );//decay
 		m1.End();
 
-		if( pev.weapons == 0 )
+		if( pev.weapons != q2::MOD_HYPERBLASTER )
 		{
 			NetworkMessage m2( MSG_PVS, NetworkMessages::SVC_TEMPENTITY );
 				m2.WriteByte( TE_IMPLOSION );
@@ -121,6 +121,12 @@ class q2laser : ScriptBaseEntity
 				{
 					g_WeaponFuncs.SpawnBlood( pev.origin, pOther.BloodColor(), pev.dmg );
 					pOther.TakeDamage( self.pev, pev.owner.vars, pev.dmg, DMG_ENERGYBEAM );
+
+					if( pev.weapons != q2::MOD_UNKNOWN )
+					{
+						CustomKeyvalues@ pCustom = pOther.GetCustomKeyvalues();
+						pCustom.SetKeyvalue( q2::KVN_MOD, pev.weapons );
+					}
 				}
 			}
 			else
@@ -296,6 +302,7 @@ class q2grenade : ScriptBaseEntity
 	void Explode()
 	{
 		Vector vecOrigin;
+		int mod;
 
 		//if (ent->owner->client)
 			//PlayerNoise(ent->owner, ent->s.origin, PNOISE_IMPACT);
@@ -314,10 +321,19 @@ class q2grenade : ScriptBaseEntity
 			flPoints = pev.dmg - 0.5 * vecWhat.Length(); //flPoints = ent->dmg - 0.5 * VectorLength (vecWhat);
 			vecDir = m_pEnemy.pev.origin - pev.origin; //VectorSubtract (ent->enemy->s.origin, ent->s.origin, vecDir);
 
-			q2::T_Damage( m_hEnemy, EHandle(self), EHandle(g_EntityFuncs.Instance(pev.owner)), vecDir, pev.origin, g_vecZero, flPoints, flPoints, 0 ); //DAMAGE_RADIUS
+			mod = (pev.weapons == 1) ? q2::MOD_HANDGRENADE : q2::MOD_GRENADE;
+
+			q2::T_Damage( m_hEnemy.GetEntity(), self, g_EntityFuncs.Instance(pev.owner), vecDir, pev.origin, g_vecZero, flPoints, flPoints, 0, mod ); //DAMAGE_RADIUS
 		}
 
-		q2::T_RadiusDamage( EHandle(self), EHandle(g_EntityFuncs.Instance(pev.owner)), pev.dmg, m_hEnemy, m_flDamageRadius, DMG_BLAST ); //DMG_BLAST needed ??
+		if( pev.weapons == 1 and pev.dmgtime == 0 )
+			mod = q2::MOD_HELD_GRENADE;
+		else if( pev.weapons == 1 )
+			mod = q2::MOD_HG_SPLASH;
+		else
+			mod = q2::MOD_G_SPLASH;
+
+		q2::T_RadiusDamage( self, g_EntityFuncs.Instance(pev.owner), pev.dmg, m_hEnemy.GetEntity(), m_flDamageRadius, DMG_BLAST | DMG_LAUNCH, mod ); //DMG_BLAST needed ??
 
 		vecOrigin = pev.origin + pev.velocity * -0.02; //VectorMA (ent->s.origin, -0.02, ent->velocity, vecOrigin);
 
@@ -372,6 +388,9 @@ class q2rocket : ScriptBaseEntity
 		pev.movetype = MOVETYPE_FLYMISSILE;
 		pev.solid = SOLID_BBOX;
 		pev.effects |= EF_DIMLIGHT;
+
+		if( pev.scale == 0 )
+			pev.scale = 1.0;
 
 		m_vecMoveDir = pev.velocity / pev.speed;
 		Glow();
@@ -522,13 +541,13 @@ class q2rocket : ScriptBaseEntity
 		GetSoundEntInstance().InsertSound( bits_SOUND_COMBAT, vecOrigin, NORMAL_EXPLOSION_VOLUME, 3.0, g_EntityFuncs.Instance(pev.owner) );
 
 		//I'm using this to get rocket jumping working properly
-		q2::T_RadiusDamage( EHandle(self), EHandle(g_EntityFuncs.Instance(pev.owner)), 120.0, EHandle(pOther), 120.0, DMG_BLAST/*, MOD_R_SPLASH*/ );
+		q2::T_RadiusDamage( self, g_EntityFuncs.Instance(pev.owner), 120.0, pOther, 120.0, DMG_BLAST | DMG_LAUNCH, q2::MOD_R_SPLASH );
 
 		vecOrigin = pev.origin + tr.vecPlaneNormal;
 
 		if( pOther.pev.takedamage != DAMAGE_NO )
 		{
-			q2::T_Damage( EHandle(pOther), EHandle(self), EHandle(g_EntityFuncs.Instance(pev.owner)), pev.velocity, pev.origin, tr.vecPlaneNormal, pev.dmg, 0, DMG_GENERIC/*, MOD_ROCKET*/ );
+			q2::T_Damage( pOther, self, g_EntityFuncs.Instance(pev.owner), pev.velocity, pev.origin, tr.vecPlaneNormal, pev.dmg, 0, DMG_GENERIC, q2::MOD_ROCKET );
 			//if( !(pOther.pev.FlagBitSet(FL_CLIENT) and !q2::PVP) ) //deals damage to players otherwise
 				//pOther.TakeDamage( self.pev, pev.owner.vars, pev.dmg, DMG_GENERIC );
 		}
@@ -823,8 +842,8 @@ l.ent.skinnum = (colors >> ((rand() % 4)*8)) & 0xff;
 			//PlayerNoise(self->owner, self->s.origin, PNOISE_IMPACT);
 
 		//g_WeaponFuncs.RadiusDamage( pev.origin, self.pev, pevOwner, pev.dmg, 256, CLASS_NONE, DMG_BLAST|DMG_ALWAYSGIB ); //doesn't properly do aoe dmg (try spawning several mobs on the same spot)
-		//q2::T_RadiusDamage( EHandle(self), EHandle(g_EntityFuncs.Instance(pevOwner)), pev.dmg, EHandle(pOther), 256.0, DMG_BLAST|DMG_ALWAYSGIB/*, MOD_R_SPLASH*/ );
-		q2::T_RadiusDamage( EHandle(self), EHandle(g_EntityFuncs.Instance(pev.owner)), BFG_DAMAGE1, EHandle(pOther), BFG_RADIUS1, DMG_BLAST|DMG_ALWAYSGIB/*, MOD_R_SPLASH*/ );
+		//q2::T_RadiusDamage( self, g_EntityFuncs.Instance(pevOwner), pev.dmg, pOther, 256.0, DMG_BLAST|DMG_ALWAYSGIB/*, MOD_R_SPLASH*/ );
+		q2::T_RadiusDamage( self, g_EntityFuncs.Instance(pev.owner), BFG_DAMAGE1, pOther, BFG_RADIUS1, DMG_BLAST|DMG_ALWAYSGIB|DMG_LAUNCH, q2::MOD_BFG_BLAST );
 
 		// core explosion - prevents firing it into the wall/floor
 		if( pOther.pev.takedamage != DAMAGE_NO )
@@ -833,7 +852,7 @@ l.ent.skinnum = (colors >> ((rand() % 4)*8)) & 0xff;
 				//pOther.TakeDamage( self.pev, pevOwner, pev.dmg, DMG_BLAST|DMG_ALWAYSGIB );
 
 			TraceResult tr = g_Utility.GetGlobalTrace();
-			q2::T_Damage( EHandle(pOther), EHandle(self), EHandle(g_EntityFuncs.Instance(pev.owner)), pev.velocity, pev.origin, tr.vecPlaneNormal, BFG_DAMAGE1, 0, DMG_ENERGYBEAM/*, MOD_BFG_BLAST*/ );
+			q2::T_Damage( pOther, self, g_EntityFuncs.Instance(pev.owner), pev.velocity, pev.origin, tr.vecPlaneNormal, BFG_DAMAGE1, 0, DMG_ENERGYBEAM, q2::MOD_BFG_BLAST );
 		}
 
 		g_SoundSystem.StopSound( self.edict(), CHAN_VOICE, "quake2/weapons/bfg__l1a.wav" );
@@ -863,7 +882,7 @@ l.ent.skinnum = (colors >> ((rand() % 4)*8)) & 0xff;
 			g_EntityFuncs.Remove( m_pBFG );
 
 		SetThink( ThinkFunction(this.bfg_explode) );
-		pev.nextthink = g_Engine.time + 0.1; //10_hz //FRAMETIME
+		pev.nextthink = g_Engine.time + q2::FRAMETIME; //10_hz
 	}
 
 	void bfg_explode()
@@ -941,10 +960,10 @@ l.ent.skinnum = (colors >> ((rand() % 4)*8)) & 0xff;
 		ex->ent.alpha = 0.30;
 		ex->frames = 4;*/
 
-			q2::T_Damage( EHandle(pEntity), EHandle(self), EHandle(g_EntityFuncs.Instance(pev.owner)), pev.velocity, pEntity.pev.origin, g_vecZero, flPoints, 0, DMG_ENERGYBEAM/*, MOD_BFG_EFFECT*/ );
+			q2::T_Damage( pEntity, self, g_EntityFuncs.Instance(pev.owner), pev.velocity, pEntity.pev.origin, g_vecZero, flPoints, 0, DMG_ENERGYBEAM, q2::MOD_BFG_EFFECT );
 		}
 
-		/*self->nextthink = level.time + FRAMETIME;
+		/*self->nextthink = level.time + q2::FRAMETIME;
 		self->s.frame++;
 		if (self->s.frame == 5)
 			self->think = G_FreeEdict;*/
@@ -971,57 +990,6 @@ l.ent.skinnum = (colors >> ((rand() % 4)*8)) & 0xff;
 		BaseClass.UpdateOnRemove();
 	}
 }
-/*
-class q2pscreen : ScriptBaseAnimating
-{
-	void Spawn()
-	{
-		Precache();
-
-		g_EntityFuncs.SetModel( self, "models/quake2/items/armor/effect/pscreen.mdl" );
-		g_EntityFuncs.SetSize( self.pev, g_vecZero, g_vecZero );
-		g_EntityFuncs.SetOrigin( self, pev.origin );
-
-		pev.movetype = MOVETYPE_NONE;
-		pev.solid = SOLID_NOT;
-
-		SetThink( ThinkFunction(this.RemoveThink) );
-		pev.nextthink = g_Engine.time;
-	}
-
-	void Precache()
-	{
-		g_Game.PrecacheModel( "models/quake2/items/armor/effect/pscreen.mdl" );
-
-		g_SoundSystem.PrecacheSound( "quake2/misc/mon_power2.wav" );
-		g_SoundSystem.PrecacheSound( "quake2/weapons/lashit.wav" );
-	}
-
-	void RemoveThink()
-	{
-		if( pev.renderamt > 7 )
-		{
-			pev.renderamt -= 7;
-			pev.nextthink = g_Engine.time + 0.05;
-		}
-		else 
-		{
-			pev.renderamt = 0;
-			pev.nextthink = g_Engine.time;
-			SetThink( ThinkFunction(this.SUB_Remove) );
-		}
-	}
-
-	void SUB_Remove()
-	{
-		self.UpdateOnRemove();
-
-		if( pev.health > 0 )
-			pev.health = 0;
-
-		g_EntityFuncs.Remove(self);
-	}
-}*/
 
 void RegisterLaser()
 {
@@ -1052,12 +1020,6 @@ void RegisterBFG()
 	g_CustomEntityFuncs.RegisterCustomEntity( "q2projectiles::q2bfg", "q2bfg" );
 	g_Game.PrecacheOther( "q2bfg" );
 }
-/*
-void RegisterPScreen()
-{
-	g_CustomEntityFuncs.RegisterCustomEntity( "q2projectiles::q2pscreen", "q2pscreen" );
-	g_Game.PrecacheOther( "q2pscreen" );
-}*/
 
 void RegisterProjectile( string sType )
 {

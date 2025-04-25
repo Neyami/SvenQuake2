@@ -18,7 +18,7 @@ const int NPC_HEALTH					= 240;
 const int AE_ATTACK_SPIKE			= 11;
 const int AE_ATTACK_CLUB				= 12;
 const int AE_ATTACKSOUND			= 13;
-const int AE_FLINCHRESET				= 14;
+const int AE_FIDGETCHECK				= 14;
 
 const float SPIKE_DMG_MIN			= 5.0;
 const float SPIKE_DMG_MAX			= 11.0;
@@ -65,7 +65,7 @@ enum anim_e
 
 final class npc_q2berserker : CBaseQ2NPC
 {
-	void Spawn()
+	void MonsterSpawn()
 	{
 		AppendAnims();
 
@@ -87,15 +87,11 @@ final class npc_q2berserker : CBaseQ2NPC
 			self.m_FormattedName	= "Berserker";
 
 		m_flGibHealth = -60.0;
-
-		CommonSpawn();
+		SetMass( 250 );
 
 		@this.m_Schedules = @berserker_schedules;
 
 		self.MonsterInit();
-
-		if( self.IsPlayerAlly() )
-			SetUse( UseFunction(this.FollowerUse) );
 	}
 
 	void AppendAnims()
@@ -121,11 +117,6 @@ final class npc_q2berserker : CBaseQ2NPC
 			g_SoundSystem.PrecacheSound( arrsNPCSounds[i] );
 	}
 
-	void FollowerUse( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
-	{
-		self.FollowerPlayerUse( pActivator, pCaller, useType, flValue );
-	}
-
 	void SetYawSpeed() //SUPER IMPORTANT, NPC WON'T DO ANYTHING WITHOUT THIS :aRage:
 	{
 		int ys = 120;
@@ -140,7 +131,7 @@ final class npc_q2berserker : CBaseQ2NPC
 		return CLASS_ALIEN_MILITARY;
 	}
 
-	void AlertSound()
+	void MonsterAlertSound()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_SIGHT], VOL_NORM, ATTN_NORM );
 	}
@@ -158,6 +149,24 @@ final class npc_q2berserker : CBaseQ2NPC
 		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_DEATH], VOL_NORM, ATTN_NORM );
 	}
 
+	void berserk_fidget()
+	{
+		if( !HasFlags(m_iSpawnFlags, q2npc::SPAWNFLAG_MONSTER_AMBUSH) )
+		{
+			/*if( HasFlags(monsterinfo.aiflags, AI_STAND_GROUND) )
+				return;
+			else */if( self.m_hEnemy.IsValid() )
+				return;
+
+			if( Math.RandomFloat(0.0, 1.0) > 0.15 )
+				return;
+
+			self.ChangeSchedule( slBerserkerFidget );
+			//the original plays this out of sync with the animation
+			//g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_IDLE1], VOL_NORM, ATTN_IDLE );
+		}
+	}
+
 	void HandleAnimEventQ2( MonsterEvent@ pEvent )
 	{
 		switch( pEvent.event )
@@ -165,6 +174,13 @@ final class npc_q2berserker : CBaseQ2NPC
 			case q2npc::AE_IDLESOUND:
 			{
 				g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_IDLE1], VOL_NORM, ATTN_IDLE );
+				break;
+			}
+
+			//I SURE WISH THE DEVS WOULD HAVE USED ONLY ONE WAY OF DETERMINING WHEN TO FIDGET :aRage:
+			case AE_FIDGETCHECK:
+			{
+				berserk_fidget();
 				break;
 			}
 
@@ -260,6 +276,8 @@ final class npc_q2berserker : CBaseQ2NPC
 		if( pev.deadflag == DEAD_NO )
 			HandlePain( flDamage );
 
+		M_ReactToDamage( g_EntityFuncs.Instance(pevAttacker) );
+
 		return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
 	}
 
@@ -315,13 +333,13 @@ final class npc_q2berserker : CBaseQ2NPC
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_DEATH_GIB], VOL_NORM, ATTN_NORM );
 
-		ThrowGib( 2, MODEL_GIB_BONE, pev.dmg, -1, BREAK_FLESH );
-		ThrowGib( 3, MODEL_GIB_MEAT, pev.dmg, -1, BREAK_FLESH );
-		ThrowGib( 1, MODEL_GIB_GEAR, pev.dmg, -1, BREAK_METAL );
-		ThrowGib( 1, MODEL_GIB_CHEST, pev.dmg, 2, BREAK_FLESH );
-		ThrowGib( 1, MODEL_GIB_HAMMER, pev.dmg, 10, BREAK_CONCRETE );
-		ThrowGib( 1, MODEL_GIB_THIGH, pev.dmg, Math.RandomLong(0, 1) == 0 ? 11 : 15, BREAK_FLESH );
-		ThrowGib( 1, MODEL_GIB_HEAD, pev.dmg, 3, BREAK_FLESH );
+		q2::ThrowGib( self, 2, MODEL_GIB_BONE, pev.dmg, -1, BREAK_FLESH );
+		q2::ThrowGib( self, 3, MODEL_GIB_MEAT, pev.dmg, -1, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_GEAR, pev.dmg, -1, BREAK_METAL );
+		q2::ThrowGib( self, 1, MODEL_GIB_CHEST, pev.dmg, 2, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_HAMMER, pev.dmg, 10, BREAK_CONCRETE );
+		q2::ThrowGib( self, 1, MODEL_GIB_THIGH, pev.dmg, Math.RandomLong(0, 1) == 0 ? 11 : 15, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_HEAD, pev.dmg, 3, BREAK_FLESH );
 
 		SetThink( ThinkFunction(this.SUB_Remove) );
 		pev.nextthink = g_Engine.time;
@@ -343,9 +361,24 @@ final class npc_q2berserker : CBaseQ2NPC
 
 array<ScriptSchedule@>@ berserker_schedules;
 
+ScriptSchedule slBerserkerFidget
+(
+	bits_COND_NEW_ENEMY		|
+	bits_COND_SEE_FEAR			|
+	bits_COND_LIGHT_DAMAGE	|
+	bits_COND_HEAVY_DAMAGE	|
+	bits_COND_PROVOKED,
+	0,
+	"Berserker Idle Fidgeting"
+);
+
 void InitSchedules()
 {
 	InitQ2BaseSchedules();
+
+	slBerserkerFidget.AddTask( ScriptTask(TASK_STOP_MOVING) );
+	slBerserkerFidget.AddTask( ScriptTask(TASK_PLAY_SEQUENCE, float(ACT_TWITCH)) );
+	slBerserkerFidget.AddTask( ScriptTask(TASK_SET_ACTIVITY, float(ACT_IDLE)) );
 
 	array<ScriptSchedule@> scheds = { slQ2Pain1, slQ2Pain2 };
 

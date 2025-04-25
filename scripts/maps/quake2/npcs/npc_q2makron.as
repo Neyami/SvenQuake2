@@ -93,7 +93,7 @@ final class npc_q2makron : CBaseQ2NPC
 {
 	private Vector m_vecRailgunTarget;
 
-	void Spawn()
+	void MonsterSpawn()
 	{
 		AppendAnims();
 
@@ -115,17 +115,13 @@ final class npc_q2makron : CBaseQ2NPC
 			self.m_FormattedName	= "Makron";
 
 		m_flGibHealth = -2000.0;
-
-		CommonSpawn();
+		SetMass( 500 );
 
 		@this.m_Schedules = @makron_schedules;
 
 		self.MonsterInit();
 
-		if( self.IsPlayerAlly() )
-			SetUse( UseFunction(this.FollowerUse) );
-
-		if( pev.weapons == 4269 )
+		if( pev.team == 4269 )
 		{
 			self.ChangeSchedule( slMakronActivate );
 			self.SetState( MONSTERSTATE_SCRIPT );
@@ -144,11 +140,6 @@ final class npc_q2makron : CBaseQ2NPC
 
 		for( uint i = 0; i < arrsNPCSounds.length(); ++i )
 			g_SoundSystem.PrecacheSound( arrsNPCSounds[i] );
-	}
-
-	void FollowerUse( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
-	{
-		self.FollowerPlayerUse( pActivator, pCaller, useType, flValue );
 	}
 
 	void SetYawSpeed() //SUPER IMPORTANT, NPC WON'T DO ANYTHING WITHOUT THIS :aRage:
@@ -204,7 +195,7 @@ final class npc_q2makron : CBaseQ2NPC
 		{
 			case TASK_PLAY_SEQUENCE:
 			{
-				if( pev.weapons == 4269 )
+				if( pev.team == 4269 )
 				{
 					if( self.m_hEnemy.IsValid() )
 					{
@@ -217,7 +208,7 @@ final class npc_q2makron : CBaseQ2NPC
 						pev.velocity.z = 200;
 					}
 
-					pev.weapons = 0;
+					pev.team = 0;
 				}
 
 				BaseClass.StartTask( pTask );
@@ -467,6 +458,8 @@ final class npc_q2makron : CBaseQ2NPC
 		bitsDamageType &= ~DMG_ALWAYSGIB;
 		bitsDamageType |= DMG_NEVERGIB;
 
+		M_ReactToDamage( g_EntityFuncs.Instance(pevAttacker) );
+
 		return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
 	}
 
@@ -560,7 +553,7 @@ final class npc_q2makron : CBaseQ2NPC
 
 	bool ShouldGibMonster( int iGib ) { return false; }
 
-	void Killed( entvars_t@ pevAttacker, int iGib )
+	void MonsterKilled( entvars_t@ pevAttacker, int iGib )
 	{
 		//prevent spawning more than 1 torso
 		if( pev.body != 1 )
@@ -568,7 +561,6 @@ final class npc_q2makron : CBaseQ2NPC
 
 		pev.body = 1;
 		g_EntityFuncs.SetSize( self.pev, NPC_MINS, Vector(32, 32, 88) );
-		BaseClass.Killed( pevAttacker, GIB_NEVER );
 	}
 
 	void makron_spawn_torso()

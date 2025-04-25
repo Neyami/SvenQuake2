@@ -19,8 +19,8 @@ final class item_silencer : ScriptBaseItemEntity, item_q2pickup
 {
 	item_silencer()
 	{
-		m_iItemID = IT_ITEM_SILENCER;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iItemID = q2::IT_ITEM_SILENCER;
+		m_iWorldModelFlags = q2::EF_ROTATE;
 		m_sModel = "models/quake2/items/silencer.mdl";
 		m_sSound = "quake2/items/pkup.wav";
 		m_flRespawnTime = 60.0;
@@ -96,7 +96,7 @@ class weapon_q2silencer : ScriptBasePlayerWeaponEntity
 		{
 			CustomKeyvalues@ pCustom = m_pPlayer.GetCustomKeyvalues();
 			HUDNumDisplayParams hudParams;
-			q2items::GetHudParams( m_pPlayer, q2items::IT_ITEM_SILENCER, hudParams );
+			q2items::GetHudParams( m_pPlayer, q2::IT_ITEM_SILENCER, hudParams );
 
 			int iShots = SILENCER_SHOTS;
 			if( pCustom.GetKeyvalue(SILENCER_KVN).GetInteger() >= 1 )

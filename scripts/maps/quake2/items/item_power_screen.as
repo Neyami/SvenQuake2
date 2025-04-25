@@ -10,8 +10,8 @@ final class item_power_screen : ScriptBaseItemEntity, item_q2pickup
 {
 	item_power_screen()
 	{
-		m_iItemID = IT_ITEM_POWER_SCREEN;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iItemID = q2::IT_ITEM_POWER_SCREEN;
+		m_iWorldModelFlags = q2::EF_ROTATE;
 		m_sModel = "models/quake2/items/screen.mdl";
 		m_sSound = "quake2/misc/ar3_pkup.wav";
 		m_flRespawnTime = 2.0; //60
@@ -101,13 +101,13 @@ class weapon_q2powerscreen : ScriptBasePlayerWeaponEntity
 			//always use the power shield if the player has it
 			if( m_pPlayer.HasNamedPlayerItem(PSHIELDWEAP_NAME) !is null )
 			{
-				q2items::GetHudParams( m_pPlayer, q2items::IT_ITEM_POWER_SHIELD, hudParams );
-				pCustom.SetKeyvalue( PARMOR_KVN, q2items::POWER_ARMOR_SHIELD );
+				q2items::GetHudParams( m_pPlayer, q2::IT_ITEM_POWER_SHIELD, hudParams );
+				pCustom.SetKeyvalue( PARMOR_KVN, q2::POWER_ARMOR_SHIELD );
 			}
 			else
 			{
-				q2items::GetHudParams( m_pPlayer, q2items::IT_ITEM_POWER_SCREEN, hudParams );
-				pCustom.SetKeyvalue( PARMOR_KVN, q2items::POWER_ARMOR_SCREEN );
+				q2items::GetHudParams( m_pPlayer, q2::IT_ITEM_POWER_SCREEN, hudParams );
+				pCustom.SetKeyvalue( PARMOR_KVN, q2::POWER_ARMOR_SCREEN );
 			}
 
 			g_PlayerFuncs.HudNumDisplay( m_pPlayer, hudParams );

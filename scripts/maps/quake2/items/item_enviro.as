@@ -43,8 +43,8 @@ final class item_enviro : ScriptBaseItemEntity, item_q2pickup
 {
 	item_enviro()
 	{
-		m_iItemID = IT_ITEM_ENVIROSUIT;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iItemID = q2::IT_ITEM_ENVIROSUIT;
+		m_iWorldModelFlags = q2::EF_ROTATE;
 		m_sModel = MODEL_ENVIRO;
 		m_sSound = "quake2/items/pkup.wav";
 		m_flRespawnTime = ENVIRO_RESPAWN;
@@ -124,7 +124,7 @@ class weapon_q2envirosuit : ScriptBasePlayerWeaponEntity
 		{
 			CustomKeyvalues@ pCustom = m_pPlayer.GetCustomKeyvalues();
 			HUDNumDisplayParams hudParams;
-			q2items::GetHudParams( m_pPlayer, q2items::IT_ITEM_ENVIROSUIT, hudParams );
+			q2items::GetHudParams( m_pPlayer, q2::IT_ITEM_ENVIROSUIT, hudParams );
 
 			float flDuration = ENVIRO_DURATION;
 			if( pCustom.GetKeyvalue(ENVIRO_KVN).GetInteger() >= 1 )
@@ -172,7 +172,7 @@ class weapon_q2envirosuit : ScriptBasePlayerWeaponEntity
 
 void RunEnvirosuit( CBasePlayer@ pPlayer )
 {
-	if( IsItemActive(pPlayer, IT_ITEM_ENVIROSUIT) )
+	if( IsItemActive(pPlayer, q2::IT_ITEM_ENVIROSUIT) )
 	{
 		if( pPlayer.pev.waterlevel == WATERLEVEL_HEAD )
 		{

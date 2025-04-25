@@ -75,7 +75,7 @@ final class npc_q2parasite : CBaseQ2NPC
 
 	private float m_flFidgetLoopCheck;
 
-	void Spawn()
+	void MonsterSpawn()
 	{
 		AppendAnims();
 
@@ -97,15 +97,11 @@ final class npc_q2parasite : CBaseQ2NPC
 			self.m_FormattedName	= "Parasite";
 
 		m_flGibHealth = -60.0;
-
-		CommonSpawn();
+		SetMass( 250 );
 
 		@this.m_Schedules = @parasite_schedules;
 
 		self.MonsterInit();
-
-		if( self.IsPlayerAlly() )
-			SetUse( UseFunction(this.FollowerUse) );
 	}
 
 	void AppendAnims()
@@ -130,11 +126,6 @@ final class npc_q2parasite : CBaseQ2NPC
 			g_SoundSystem.PrecacheSound( arrsNPCSounds[i] );
 	}
 
-	void FollowerUse( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
-	{
-		self.FollowerPlayerUse( pActivator, pCaller, useType, flValue );
-	}
-
 	void SetYawSpeed() //SUPER IMPORTANT, NPC WON'T DO ANYTHING WITHOUT THIS :aRage:
 	{
 		int ys = 120;
@@ -149,7 +140,7 @@ final class npc_q2parasite : CBaseQ2NPC
 		return CLASS_ALIEN_MILITARY; //??
 	}
 
-	void AlertSound()
+	void MonsterAlertSound()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_SIGHT], VOL_NORM, ATTN_NORM );
 	}
@@ -161,6 +152,12 @@ final class npc_q2parasite : CBaseQ2NPC
 
 	void RunAI()
 	{
+		if( m_flTriggeredSpawn > 0 )
+		{
+			m_flTriggeredSpawn = 0.0;
+			monster_triggered_spawn();
+		}
+
 		BaseClass.RunAI();
 
 		CheckArmorEffect();
@@ -229,7 +226,10 @@ final class npc_q2parasite : CBaseQ2NPC
 			case SCHED_IDLE_STAND:
 			{
 				if( ShouldFidget() )
+				{
+					m_flIdleTime = g_Engine.time + 15.0 + Math.RandomFloat(0.0, 1.0) * 15.0;
 					return slParasiteFidget;
+				}
 				else
 					return BaseClass.GetScheduleOfType( iType );
 			}
@@ -244,7 +244,9 @@ final class npc_q2parasite : CBaseQ2NPC
 		{
 			case AE_IDLETAP:
 			{
-				g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_TAP], 0.75, 2.75 );
+				if( !HasFlags(m_iSpawnFlags, q2npc::SPAWNFLAG_MONSTER_AMBUSH) )
+					g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_TAP], 0.75, 2.75 );
+
 				break;
 			}
 
@@ -401,6 +403,8 @@ final class npc_q2parasite : CBaseQ2NPC
 		if( pev.deadflag == DEAD_NO )
 			HandlePain( flDamage );
 
+		M_ReactToDamage( g_EntityFuncs.Instance(pevAttacker) );
+
 		return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
 	}
 
@@ -424,24 +428,23 @@ final class npc_q2parasite : CBaseQ2NPC
 		self.ChangeSchedule( slQ2Pain1 );
 	}
 
-	void Killed( entvars_t@ pevAttacker, int iGib )
+	void MonsterKilled( entvars_t@ pevAttacker, int iGib )
 	{
 		DestroyEffect();
-		BaseClass.Killed( pevAttacker, iGib );
 	}
 
 	void GibMonster()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_DEATH_GIB], VOL_NORM, ATTN_NORM );
 
-		ThrowGib( 1, MODEL_GIB_BONE, pev.dmg, -1, BREAK_FLESH );
-		ThrowGib( 3, MODEL_GIB_MEAT, pev.dmg, -1, BREAK_FLESH );
-		ThrowGib( 1, MODEL_GIB_CHEST, pev.dmg, 2, BREAK_FLESH );
-		ThrowGib( 1, MODEL_GIB_BLEG, pev.dmg, 19, 0 );
-		ThrowGib( 1, MODEL_GIB_BLEG, pev.dmg, 24, 0 );
-		ThrowGib( 1, MODEL_GIB_FLEG, pev.dmg, 14, BREAK_FLESH );
-		ThrowGib( 1, MODEL_GIB_FLEG, pev.dmg, 17, BREAK_FLESH );
-		ThrowGib( 1, MODEL_GIB_HEAD, pev.dmg, 4, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_BONE, pev.dmg, -1, BREAK_FLESH );
+		q2::ThrowGib( self, 3, MODEL_GIB_MEAT, pev.dmg, -1, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_CHEST, pev.dmg, 2, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_BLEG, pev.dmg, 19, 0 );
+		q2::ThrowGib( self, 1, MODEL_GIB_BLEG, pev.dmg, 24, 0 );
+		q2::ThrowGib( self, 1, MODEL_GIB_FLEG, pev.dmg, 14, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_FLEG, pev.dmg, 17, BREAK_FLESH );
+		q2::ThrowGib( self, 1, MODEL_GIB_HEAD, pev.dmg, 4, BREAK_FLESH );
 
 		SetThink( ThinkFunction(this.SUB_Remove) );
 		pev.nextthink = g_Engine.time;

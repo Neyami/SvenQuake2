@@ -9,8 +9,8 @@ final class item_adrenaline : ScriptBaseItemEntity, item_q2pickup
 {
 	item_adrenaline()
 	{
-		m_iItemID = IT_ITEM_ADRENALINE;
-		m_iWorldModelFlags = EF_ROTATE;
+		m_iItemID = q2::IT_ITEM_ADRENALINE;
+		m_iWorldModelFlags = q2::EF_ROTATE;
 		m_sModel = "models/quake2/items/adrenaline.mdl";
 		m_sSound = "quake2/items/pkup.wav";
 		m_flRespawnTime = 60.0;

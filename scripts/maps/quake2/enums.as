@@ -1,6 +1,7 @@
-namespace q2items
+namespace q2
 {
 
+//items
 enum wmflags_e
 {
 	EF_ROTATE = 1,
@@ -28,6 +29,7 @@ enum itemids_e
 
 	IT_ITEM_QUAD,
 	IT_ITEM_INVULNERABILITY,
+	IT_ITEM_INVISIBILITY,
 	IT_ITEM_SILENCER,
 	IT_ITEM_REBREATHER,
 	IT_ITEM_ENVIROSUIT,
@@ -35,6 +37,8 @@ enum itemids_e
 	IT_ITEM_ADRENALINE,
 	IT_ITEM_BANDOLIER,
 	IT_ITEM_PACK,
+
+	IT_KEY_RED_KEY,
 
 	IT_HEALTH_SMALL,
 	IT_HEALTH_MEDIUM,
@@ -44,4 +48,79 @@ enum itemids_e
 	IT_TOTAL
 };
 
-} //end of namespace q2items
+// means of death
+enum mod_e
+{
+	MOD_UNKNOWN					= 0,
+	MOD_BLASTER,
+	MOD_SHOTGUN,
+	MOD_SSHOTGUN,
+	MOD_MACHINEGUN,
+	MOD_CHAINGUN,					//5
+	MOD_GRENADE,
+	MOD_G_SPLASH,
+	MOD_ROCKET,
+	MOD_R_SPLASH,
+	MOD_HYPERBLASTER,			//10
+	MOD_RAILGUN,
+	MOD_BFG_LASER,
+	MOD_BFG_BLAST,
+	MOD_BFG_EFFECT,
+	MOD_HANDGRENADE,			//15
+	MOD_HG_SPLASH,
+	MOD_WATER,
+	MOD_SLIME,
+	MOD_LAVA,
+	MOD_CRUSH,						//20
+	MOD_TELEFRAG,
+	MOD_TELEFRAG_SPAWN,
+	MOD_FALLING,
+	MOD_SUICIDE,
+	MOD_HELD_GRENADE,			//25
+	MOD_EXPLOSIVE,
+	MOD_BARREL,
+	MOD_BOMB,
+	MOD_EXIT,
+	MOD_SPLASH,						//30
+	MOD_TARGET_LASER,
+	MOD_TRIGGER_HURT,
+	MOD_HIT,
+	MOD_TARGET_BLASTER,
+	MOD_RIPPER,						//35
+	MOD_PHALANX,
+	MOD_BRAINTENTACLE,
+	MOD_BLASTOFF,
+	MOD_GEKK,
+	MOD_TRAP,							//40
+	MOD_CHAINFIST,
+	MOD_DISINTEGRATOR,
+	MOD_ETF_RIFLE,
+	MOD_BLASTER2,
+	MOD_HEATBEAM,					//45
+	MOD_TESLA,
+	MOD_PROX,
+	MOD_NUKE,
+	MOD_VENGEANCE_SPHERE,
+	MOD_HUNTER_SPHERE,			//50
+	MOD_DEFENDER_SPHERE,
+	MOD_TRACKER,
+	MOD_DBALL_CRUSH,
+	MOD_DOPPLE_EXPLODE,
+	MOD_DOPPLE_VENGEANCE,	//55
+	MOD_DOPPLE_HUNTER,
+	MOD_GRAPPLE,
+	MOD_BLUEBLASTER
+};
+
+enum gib_type_t
+{
+	GIB_NONE =      0, // no flags (organic)
+	GIB_METALLIC =  1, // bouncier
+	GIB_ACID =		2, // acidic (gekk)
+	GIB_HEAD =		4, // head gib; the input entity will transform into this
+	GIB_DEBRIS =	8, // explode outwards rather than in velocity, no blood
+	GIB_SKINNED =	16, // use skinnum
+	GIB_UPRIGHT =   32 // stay upright on ground
+};
+
+} //end of namespace q2

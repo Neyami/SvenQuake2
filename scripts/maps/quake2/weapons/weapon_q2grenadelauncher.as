@@ -78,6 +78,7 @@ class weapon_q2grenadelauncher : CBaseQ2Weapon
 
 		g_Game.PrecacheGeneric( "sprites/quake2/weapons/" + WEAPON_NAME + ".txt" );
 		g_Game.PrecacheGeneric( "sprites/quake2/gl_icon.spr" );
+		g_Game.PrecacheGeneric( "sprites/quake2/ammo.spr" );
 	}
 
 	bool GetItemInfo( ItemInfo& out info )
@@ -122,8 +123,7 @@ class weapon_q2grenadelauncher : CBaseQ2Weapon
 
 	void PrimaryAttack()
 	{
-		int ammo = m_pPlayer.m_rgAmmo( self.m_iPrimaryAmmoType );
-		if( ammo <= 0 )
+		if( m_pPlayer.m_rgAmmo(self.m_iPrimaryAmmoType) <= 0 )
 		{
 			self.PlayEmptySound();
 			self.m_flNextPrimaryAttack = g_Engine.time + 0.75;
@@ -131,15 +131,20 @@ class weapon_q2grenadelauncher : CBaseQ2Weapon
 			return;
 		}
 
-		--ammo;
-		m_pPlayer.m_rgAmmo( self.m_iPrimaryAmmoType, ammo );
-		m_pPlayer.m_iWeaponVolume = LOUD_GUN_VOLUME;
+		G_RemoveAmmo( 1 );
+
+		//Quake 2 monsters aren't alerted to gunshots ??
+		if( q2::arrsQuake2Maps.find(g_Engine.mapname) < 0 )
+			m_pPlayer.m_iWeaponVolume = LOUD_GUN_VOLUME;
+
 		m_pPlayer.SetAnimation( PLAYER_ATTACK1 );
 
 		self.SendWeaponAnim( ANIM_SHOOT );
 
 		g_SoundSystem.EmitSound( m_pPlayer.edict(), CHAN_WEAPON, pQ2WSounds[SND_SHOOT], GetSilencedVolume(VOL_NORM), ATTN_NORM );
-		GetSoundEntInstance().InsertSound( bits_SOUND_COMBAT, pev.origin, int(386 * GetSilencedVolume(1.0)), 3.0, self );
+
+		//if( q2::arrsQuake2Maps.find(g_Engine.mapname) < 0 )
+			//GetSoundEntInstance().InsertSound( bits_SOUND_COMBAT, pev.origin, int(386 * GetSilencedVolume(1.0)), 3.0, self );
 
 		Math.MakeVectors( m_pPlayer.pev.v_angle + m_pPlayer.pev.punchangle );
 		Vector vecMuzzle = m_pPlayer.GetGunPosition() + g_Engine.v_forward * 5 + g_Engine.v_right * 5 + g_Engine.v_up * -5;
@@ -160,7 +165,7 @@ class weapon_q2grenadelauncher : CBaseQ2Weapon
 		muzzleflash( vecMuzzle, 255, 128, 0 );
 		fire_grenade( vecMuzzle, vecAim, flDamage, Q2W_SPEED, Q2W_RADIUS );
 
-		if( ammo > 0 )
+		if( m_pPlayer.m_rgAmmo(self.m_iPrimaryAmmoType) > 0 )
 			m_flReloadSound = g_Engine.time + 0.1;
 
 		CheckSilencer();

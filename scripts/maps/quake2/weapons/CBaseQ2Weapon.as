@@ -1,6 +1,7 @@
 class CBaseQ2Weapon : ScriptBasePlayerWeaponEntity
 {
 	bool m_bRerelease = true;
+	float m_iAmmoWarning;
 
 	protected CBasePlayer@ m_pPlayer
 	{
@@ -52,7 +53,7 @@ class CBaseQ2Weapon : ScriptBasePlayerWeaponEntity
 	void UpdateSilencerHUD( CBasePlayer@ pPlayer, int iSilencerShots )
 	{
 		HUDNumDisplayParams hudParams;
-		q2items::GetHudParams( pPlayer, q2items::IT_ITEM_SILENCER, hudParams );
+		q2items::GetHudParams( pPlayer, q2::IT_ITEM_SILENCER, hudParams );
 
 		hudParams.value = iSilencerShots;
 
@@ -61,7 +62,7 @@ class CBaseQ2Weapon : ScriptBasePlayerWeaponEntity
 
 	bool CheckQuadDamage()
 	{
-		if( q2items::IsItemActive(m_pPlayer, q2items::IT_ITEM_QUAD) )
+		if( q2items::IsItemActive(m_pPlayer, q2::IT_ITEM_QUAD) )
 		{
 			m_pPlayer.pev.renderfx = kRenderFxGlowShell;
 			m_pPlayer.pev.rendercolor.z = 255;
@@ -71,6 +72,32 @@ class CBaseQ2Weapon : ScriptBasePlayerWeaponEntity
 		}
 
 		return false;
+	}
+
+	void G_RemoveAmmo( int iAmount )
+	{
+		if( G_CheckInfiniteAmmo() )
+			return;
+
+		bool bPreWarning = m_pPlayer.m_rgAmmo(self.m_iPrimaryAmmoType) <= m_iAmmoWarning;
+
+		m_pPlayer.m_rgAmmo( self.m_iPrimaryAmmoType, m_pPlayer.m_rgAmmo(self.m_iPrimaryAmmoType) - iAmount );
+
+		bool bPostWarning = m_pPlayer.m_rgAmmo(self.m_iPrimaryAmmoType) <= m_iAmmoWarning;
+
+		if( !bPreWarning and bPostWarning )
+			g_SoundSystem.EmitSoundDyn( m_pPlayer.edict(), CHAN_AUTO, "quake2/weapons/lowammo.wav", VOL_NORM, ATTN_NORM );
+
+		if( self.pszAmmo1() == "q2cells" )
+			q2::G_CheckPowerArmor( EHandle(m_pPlayer) );
+	}
+
+	bool G_CheckInfiniteAmmo()
+	{
+		//if (item->flags & IF_NO_INFINITE_AMMO)
+			//return false;
+
+		return q2weapons::cvar_InfiniteAmmo.GetInt() == 1/* or (q2::PVP and g_instagib->integer)*/;
 	}
 
 	void muzzleflash( Vector vecOrigin, int iR, int iG, int iB, int iRadius = 20 )
@@ -127,7 +154,7 @@ class CBaseQ2Weapon : ScriptBasePlayerWeaponEntity
 		g_EntityFuncs.DispatchSpawn( pGrenade.self.edict() );
 
 		Math.MakeVectors( vecAim );
-		pGrenade.pev.velocity = pGrenade.pev.velocity + g_Engine.v_up * (200 + crandom_open() * 10.0) + g_Engine.v_right * (crandom_open() * 10.0);
+		pGrenade.pev.velocity = pGrenade.pev.velocity + g_Engine.v_up * (200 + q2::crandom_open() * 10.0) + g_Engine.v_right * (q2::crandom_open() * 10.0);
 	}
 
 	void fire_grenade2( Vector vecStart, Vector vecVelocity, float flDamage, float flTimer, float flDamageRadius )
@@ -228,13 +255,31 @@ class CBaseQ2Weapon : ScriptBasePlayerWeaponEntity
 		pBFG.pev.dmgtime = flDamageRadius;
 	}
 
-	//from quake 2 rerelease
-	float crandom_open()
+	//CBaseEntity@ CheckTraceHullAttack( float flDist, float flDamage, int iDmgType )
+	//bool fire_player_melee( const Vector &in vecStart, const Vector &in vecEnd, float flDist, float flDamage, int kick/*, mod_t mod*/ )
+	bool fire_player_melee( const Vector &in vecStart, float flDist, float flDamage, int kick )
 	{
-		// Generate a random float in [0.0, 1.0)
-		float randomValue = Math.RandomFloat( 0.0, 1.0 );
+		if( flDamage <= 0 ) return false;
 
-		// Scale and shift to match the range (-1.0, 1.0]
-		return randomValue * 2.0 - 1.0;
+		TraceResult tr;
+
+		Math.MakeVectors( m_pPlayer.pev.angles );
+
+		Vector vecEnd = vecStart + (g_Engine.v_forward * flDist);
+
+		g_Utility.TraceHull( vecStart, vecEnd, dont_ignore_monsters, head_hull, self.edict(), tr );
+
+		if( tr.pHit !is null )
+		{
+			CBaseEntity@ pHit = g_EntityFuncs.Instance( tr.pHit );
+
+			//pHit.TakeDamage( self.pev, self.pev, flDamage, DMG_SLASH );
+			Vector closest_point_to_check = q2::closest_point_to_box( vecStart, pHit.pev.origin + pHit.pev.mins, pHit.pev.origin + pHit.pev.maxs );
+			q2::T_Damage( pHit, self, self, g_Engine.v_forward, closest_point_to_check, -g_Engine.v_forward, flDamage, kick / 2, 0 ); //DAMAGE_DESTROY_ARMOR | DAMAGE_NO_KNOCKBACK
+
+			return true;
+		}
+
+		return false;
 	}
 }

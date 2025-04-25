@@ -35,15 +35,13 @@ const float ROCKET_DMG_HEAT		= 40;
 const float ROCKET_SPEED_HEAT	= 500.0;
 const float ROCKET_HEATSEEKING	= 0.075; //turn-rate, higher number means better heatseeking
 
-const int SPAWNFLAG_SUPERTANK_POWERSHIELD = 8;
-
 const array<string> arrsNPCSounds =
 {
 	"quake2/misc/udeath.wav",
 	"quake2/npcs/supertank/btkunqv1.wav",
 	"quake2/npcs/supertank/btkunqv2.wav",
 	"quake2/npcs/supertank/btkengn1.wav",
-	"quake2/npcs/infantry/infatck1.wav", //machine gun
+	"quake2/npcs/enforcer/infatck1.wav", //machine gun
 	"quake2/weapons/grenlf1a.wav", //grenade launcher
 	"quake2/npcs/tank/rocket.wav", //rocket launcher
 	"quake2/weapons/rocklx1a.wav",
@@ -89,8 +87,22 @@ final class npc_q2supertank : CBaseQ2NPC
 {
 	private float m_flChaingunMinfire;
 	private int m_iDeathExplosions;
+	private bool m_bBoss;
 
-	void Spawn()
+	bool MonsterKeyValue( const string& in szKey, const string& in szValue )
+	{
+		if( szKey == "boss" )
+		{
+			if( atoi(szValue) >= 1 )
+				m_bBoss = true;
+
+			return true;
+		}
+
+		return false;
+	}
+
+	void MonsterSpawn()
 	{
 		AppendAnims();
 
@@ -110,7 +122,7 @@ final class npc_q2supertank : CBaseQ2NPC
 
 		if( string(self.m_FormattedName).IsEmpty() )
 		{
-			if( (pev.weapons & SPAWNFLAG_SUPERTANK_POWERSHIELD) == 0 )
+			if( !m_bBoss )
 				self.m_FormattedName	= "Super Tank";
 			else
 				self.m_FormattedName	= "Super Tank Boss";
@@ -118,22 +130,18 @@ final class npc_q2supertank : CBaseQ2NPC
 
 		m_flGibHealth = -500.0;
 		m_flHeatTurnRate = ROCKET_HEATSEEKING;
+		SetMass( 800 );
 
-		if( (pev.weapons & SPAWNFLAG_SUPERTANK_POWERSHIELD) != 0 )
+		if( m_bBoss )
 		{
 			pev.skin = 2;
 			m_iPowerArmorType = q2npc::POWER_ARMOR_SHIELD;
 			m_iPowerArmorPower = 400;
 		}
 
-		CommonSpawn();
-
 		@this.m_Schedules = @supertank_schedules;
 
 		self.MonsterInit();
-
-		if( self.IsPlayerAlly() )
-			SetUse( UseFunction(this.FollowerUse) );
 	}
 
 	void AppendAnims()
@@ -158,11 +166,6 @@ final class npc_q2supertank : CBaseQ2NPC
 
 		for( uint i = 0; i < arrsNPCSounds.length(); ++i )
 			g_SoundSystem.PrecacheSound( arrsNPCSounds[i] );
-	}
-
-	void FollowerUse( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
-	{
-		self.FollowerPlayerUse( pActivator, pCaller, useType, flValue );
 	}
 
 	void SetYawSpeed() //SUPER IMPORTANT, NPC WON'T DO ANYTHING WITHOUT THIS :aRage:
@@ -380,7 +383,7 @@ final class npc_q2supertank : CBaseQ2NPC
 		self.GetAttachment( ATTACH_GREN_LEFT+(iGrenadeNum-1), vecMuzzle, void );
 		Vector vecAimPoint, vecForward;
 
-		PredictAim( self.m_hEnemy, vecMuzzle, 0, false, crandom_open() * 0.1, vecForward, vecAimPoint );
+		PredictAim( self.m_hEnemy, vecMuzzle, 0, false, q2::crandom_open() * 0.1, vecForward, vecAimPoint );
 
 		for( float flSpeed = 500.0; flSpeed < 1000.0; flSpeed += 100.0 )
 		{
@@ -410,7 +413,7 @@ final class npc_q2supertank : CBaseQ2NPC
 		{
 			monster_muzzleflash( vecMuzzle, 255, 128, 51 );
 
-			if( (pev.weapons & SPAWNFLAG_SUPERTANK_POWERSHIELD) != 0 )
+			if( m_bBoss )
 			{
 				Vector vecEnemyOrigin = self.m_hEnemy.GetEntity().pev.origin;
 				vecEnemyOrigin.z += self.m_hEnemy.GetEntity().pev.view_ofs.z;
@@ -474,6 +477,8 @@ final class npc_q2supertank : CBaseQ2NPC
 
 		bitsDamageType &= ~DMG_ALWAYSGIB;
 		bitsDamageType |= DMG_NEVERGIB;
+
+		M_ReactToDamage( g_EntityFuncs.Instance(pevAttacker) );
 
 		return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
 	}
@@ -594,25 +599,24 @@ final class npc_q2supertank : CBaseQ2NPC
 
 	bool ShouldGibMonster( int iGib ) { return false; }
 
-	void Killed( entvars_t@ pevAttacker, int iGib )
+	void MonsterKilled( entvars_t@ pevAttacker, int iGib )
 	{
 		g_SoundSystem.StopSound( self.edict(), CHAN_BODY, arrsNPCSounds[SND_TREAD] );
-		BaseClass.Killed( pevAttacker, iGib );
 	} 
 
 	void GibMonster()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_DEATH_GIB], VOL_NORM, ATTN_NORM );
 
-		ThrowGib( 2, MODEL_GIB_MEAT, 500, -1, BREAK_FLESH );
-		ThrowGib( 2, MODEL_GIB_METAL, 500, -1, BREAK_METAL );
-		ThrowGib( 1, MODEL_GIB_CHEST, 500, 2 );
-		ThrowGib( 1, MODEL_GIB_CORE, 500, 1 );
-		ThrowGib( 1, MODEL_GIB_LTREAD, 500, 22 );
-		ThrowGib( 1, MODEL_GIB_RTREAD, 500, 11 );
-		ThrowGib( 1, MODEL_GIB_RGUN, 500, 6 );
-		ThrowGib( 1, MODEL_GIB_TUBE, 500, -1 );
-		ThrowGib( 1, MODEL_GIB_HEAD, 500, 3, BREAK_METAL );
+		q2::ThrowGib( self, 2, MODEL_GIB_MEAT, 500, -1, BREAK_FLESH );
+		q2::ThrowGib( self, 2, MODEL_GIB_METAL, 500, -1, BREAK_METAL );
+		q2::ThrowGib( self, 1, MODEL_GIB_CHEST, 500, 2 );
+		q2::ThrowGib( self, 1, MODEL_GIB_CORE, 500, 1 );
+		q2::ThrowGib( self, 1, MODEL_GIB_LTREAD, 500, 22 );
+		q2::ThrowGib( self, 1, MODEL_GIB_RTREAD, 500, 11 );
+		q2::ThrowGib( self, 1, MODEL_GIB_RGUN, 500, 6 );
+		q2::ThrowGib( self, 1, MODEL_GIB_TUBE, 500, -1 );
+		q2::ThrowGib( self, 1, MODEL_GIB_HEAD, 500, 3, BREAK_METAL );
 
 		Explosion( pev.origin, 90 );
 
