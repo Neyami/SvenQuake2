@@ -28,10 +28,10 @@ const int SF_NOT_IN_HARD				= 1024;
 const int SF_NOT_IN_DEATHMATCH		= 65536; //2048 is reserved
 const int SF_NOT_IN_SINGLEPLAYER	= SF_NOT_IN_EASY + SF_NOT_IN_NORMAL + SF_NOT_IN_HARD;
 
-const uint8 Q2_FALLDAMAGE				= 1; //0: 10 damage flat, 1: normal damage
+const uint8 Q2_FALLDAMAGE				= 1; //0: 10 damage flat, 1: normal damage (based on height)
 
 const string KVN_ITEM_THINK			= "$f_q2itemshink";
-const string KVN_MOD						= "$i_q2modeofdeath";
+const string KVN_MOD						= "$i_q2meansofdeath";
 
 const float FRAMETIME						= 0.1;
 
@@ -48,8 +48,31 @@ array<string> arrsModelsCyborg;
 array<string> arrsModelsCrakhor;
 array<string> arrsQuake2Maps;
 
+//CCVar@ cvar_Difficulty;
+//CCVar@ cvar_ChaosMode;
+CCVar@ cvar_InfiniteAmmo; //CVAR_LATCH = no change until map restart/change ??
+CCVar@ cvar_CoopHealthScaling; //CVAR_LATCH = no change until map restart/change ??
+
+CClientCommand q2skill( "q2skill", "Difficulty level? 0-3 (default: 3)", @Quake2Settings );
+CClientCommand q2chaos( "q2chaos", "Chaos mode? 0-2 (default: 0)", @Quake2Settings );
+CClientCommand q2_infinite_ammo( "q2_infinite_ammo", "Infinite ammo for Quake 2 weapons? (default: 0)", @Quake2Settings );
+CClientCommand q2_coop_health_scaling( "q2_coop_health_scaling", "Adds health to monsters based on playercount, 0.0 - 1.0 (default: 0)", @Quake2Settings );
+CClientCommand q2deathmatch( "q2deathmatch", "Deathmatch off or on 0/1? (default: 0)", @Quake2Settings );
+CClientCommand q2giveall( "q2giveall", "Give all Quake 2 weapons and items.", @Quake2GiveAll );
+
 void InitializeCommon()
 {
+	//TEMP
+	g_SoundSystem.PrecacheSound( "quake2/world/ric1.wav" );
+	g_SoundSystem.PrecacheSound( "quake2/world/ric2.wav" );
+	g_SoundSystem.PrecacheSound( "quake2/world/ric3.wav" );
+	g_SoundSystem.PrecacheSound( "quake2/world/spark5.wav" );
+	g_SoundSystem.PrecacheSound( "quake2/world/spark6.wav" );
+	g_SoundSystem.PrecacheSound( "quake2/world/spark7.wav" );
+	//g_Game.PrecacheModel( "sprites/wep_smoke_01.spr" );
+	//g_Game.PrecacheModel( "sprites/particles/water_big.spr" );
+	g_Game.PrecacheModel( "sprites/quake2/water_big.spr" );
+
 	if( USE_QUAKE2_ITEMS )
 	{
 		q2items::g_bRerelease = true;
@@ -61,10 +84,16 @@ void InitializeCommon()
 	if( USE_QUAKE2_NPCS )
 	{
 		q2npc::g_bRerelease = true;
-		q2npc::g_iChaosMode = q2npc::CHAOS_NONE;
-		q2npc::g_iDifficulty = q2npc::DIFF_NIGHTMARE;
+		q2npc::g_iChaosMode = q2::CHAOS_NONE;
+		q2npc::g_iDifficulty = q2::DIFF_NIGHTMARE;
 
 		q2npc::InitializeNPCS();
+
+		//@cvar_Difficulty = CCVar( "q2-skill", 3, "Difficulty level? 0-3 (default: 3)", ConCommandFlag::AdminOnly );
+		//@cvar_ChaosMode = CCVar( "q2-chaos", 0, "Chaos mode? 0-2 (default: 0)", ConCommandFlag::AdminOnly );
+		@cvar_CoopHealthScaling = CCVar( "q2-health-scaling", 0, "Adds health to monsters based on playercount, 0.0 - 1.0 (default: 0)", ConCommandFlag::AdminOnly ); //level.coop_health_scaling
+
+		g_Hooks.RegisterHook( Hooks::Player::ClientPutInServer, @ClientPutInServer );
 	}
 
 	if( USE_QUAKE2_ENTITIES )
@@ -84,7 +113,11 @@ void InitializeCommon()
 	}
 
 	if( USE_QUAKE2_WEAPONS )
+	{
 		q2weapons::Register();
+
+		@cvar_InfiniteAmmo = CCVar( "q2-infinite-ammo", 0, "Infinite ammo for Quake 2 weapons? (default: 0)", ConCommandFlag::AdminOnly );
+	}
 
 	if( USE_QUAKE2_EXTRAS )
 	{
@@ -154,7 +187,7 @@ HookReturnCode PlayerSpawn( CBasePlayer@ pPlayer )
 
 HookReturnCode PlayerTakeDamage( DamageInfo@ pDamageInfo )
 {
-	if( pDamageInfo.flDamage <= 0 ) return HOOK_CONTINUE;
+	if( pDamageInfo.flDamage <= 0 or pDamageInfo.pInflictor is null ) return HOOK_CONTINUE;
 
 	CBasePlayer@ pPlayer = cast<CBasePlayer@>( pDamageInfo.pVictim );
 	if( pPlayer is null ) return HOOK_CONTINUE;
@@ -167,7 +200,8 @@ HookReturnCode PlayerTakeDamage( DamageInfo@ pDamageInfo )
 	//prevent friendly fire from causing pain sounds if PVP is off
 	//if( (pDamageInfo.pAttacker !is null and pDamageInfo.pAttacker.IsPlayer()) and !PVP ) return HOOK_CONTINUE;
 
-	if( !pDamageInfo.pInflictor.pev.FlagBitSet(FL_CLIENT) )
+	//if( !pDamageInfo.pInflictor.pev.FlagBitSet(FL_CLIENT) )
+	if( !IsAlly(pPlayer, pDamageInfo.pInflictor) )
 	{
 		float flLastPain = pCustom.GetKeyvalue("$f_lastPain").GetFloat();
 
@@ -184,7 +218,7 @@ HookReturnCode PlayerTakeDamage( DamageInfo@ pDamageInfo )
 			else
 				pDamageInfo.flDamage = 3.0 * pPlayer.pev.waterlevel;
 
-			SetModeOfDeath( pPlayer, q2::MOD_LAVA );
+			SetMeansOfDeath( pPlayer, q2::MOD_LAVA );
 			sName = "quake2/player/burn" + string( Math.RandomLong(1, 2) ) + ".wav";
 			//pDamageInfo.flDamage *= pPlayer.pev.waterlevel;
 
@@ -202,7 +236,7 @@ HookReturnCode PlayerTakeDamage( DamageInfo@ pDamageInfo )
 				return HOOK_CONTINUE;
 			}
 
-			SetModeOfDeath( pPlayer, q2::MOD_SLIME );
+			SetMeansOfDeath( pPlayer, q2::MOD_SLIME );
 
 			g_Scheduler.SetTimeout( "DelayTriggerHurt", 0.1, EHandle(pDamageInfo.pInflictor), "acid" );
 		}
@@ -213,11 +247,11 @@ HookReturnCode PlayerTakeDamage( DamageInfo@ pDamageInfo )
 			else
 				sName = GetPlayerSoundFolder( pPlayer, "fall2.wav" );
 
-			SetModeOfDeath( pPlayer, q2::MOD_FALLING );
+			SetMeansOfDeath( pPlayer, q2::MOD_FALLING );
 		}
 		else if( (iDmgType & DMG_DROWN) != 0 )
 		{
-			SetModeOfDeath( pPlayer, q2::MOD_WATER );
+			SetMeansOfDeath( pPlayer, q2::MOD_WATER );
 			sName = GetPlayerSoundFolder( pPlayer, "gurp" + string(Math.RandomLong(1, 2)) + ".wav" );
 		}
 		else
@@ -236,15 +270,15 @@ HookReturnCode PlayerTakeDamage( DamageInfo@ pDamageInfo )
 	return HOOK_CONTINUE;
 }
 
-void SetModeOfDeath( CBasePlayer@ pPlayer, int iModeOfDeath )
+void SetMeansOfDeath( CBaseEntity@ pEntity, int iMeansOfDeath )
 {
-	CustomKeyvalues@ pCustom = pPlayer.GetCustomKeyvalues();
-	pCustom.SetKeyvalue( q2::KVN_MOD, iModeOfDeath );
+	CustomKeyvalues@ pCustom = pEntity.GetCustomKeyvalues();
+	pCustom.SetKeyvalue( q2::KVN_MOD, iMeansOfDeath );
 }
 
-void ClientObituary( CBasePlayer@ pPlayer, CBaseEntity@ pInflictor, CBaseEntity@ pAttacker, float flDamage, int bitsDamageType, int iModeOfDeath )
+void ClientObituary( CBasePlayer@ pPlayer, CBaseEntity@ pInflictor, CBaseEntity@ pAttacker, float flDamage, int bitsDamageType, int iMeansOfDeath )
 {
-	//g_Game.AlertMessage( at_notice, "ClientObituary %1 %2 %3 %4 %5 %6\n", pPlayer.pev.netname, pInflictor.GetClassname(), pAttacker.GetClassname(), flDamage, bitsDamageType, iModeOfDeath );
+	//g_Game.AlertMessage( at_notice, "ClientObituary %1 %2 %3 %4 %5 %6\n", pPlayer.pev.netname, pInflictor.GetClassname(), pAttacker.GetClassname(), flDamage, bitsDamageType, iMeansOfDeath );
 	//if( bitsDamageType & (DMG_BURN | DMG_ACID) != 0 and pInflictor.pev.classname == "trigger_hurt" )
 		//return;
 
@@ -252,7 +286,7 @@ void ClientObituary( CBasePlayer@ pPlayer, CBaseEntity@ pInflictor, CBaseEntity@
 	{
 		string base;
 
-		switch( iModeOfDeath )
+		switch( iMeansOfDeath )
 		{
 			case q2::MOD_SUICIDE:
 				base = " suicides.\n";
@@ -301,7 +335,7 @@ void ClientObituary( CBasePlayer@ pPlayer, CBaseEntity@ pInflictor, CBaseEntity@
 
 		if( pAttacker !is null and pAttacker is pPlayer )
 		{
-			switch( iModeOfDeath )
+			switch( iMeansOfDeath )
 			{
 				case q2::MOD_HELD_GRENADE:
 					base = " tried to put the pin back in.\n";
@@ -336,19 +370,24 @@ void ClientObituary( CBasePlayer@ pPlayer, CBaseEntity@ pInflictor, CBaseEntity@
 		if( !base.IsEmpty() )
 		{
 			g_PlayerFuncs.ClientPrintAll( HUD_PRINTNOTIFY, string(pPlayer.pev.netname) + base );
-			KillPlayer( pPlayer, bitsDamageType );
+			bool bGib = (pPlayer.pev.health - flDamage) < -40;
+			KillPlayer( pPlayer, pAttacker, bitsDamageType, bGib );
 
 			return;
 		}
 
 		//projectiles (because pAttacker can be null)
-		if( q2npc::g_arrsQ2Projectiles.find(pInflictor.GetClassname()) >= 0 and pAttacker !is pPlayer )
+		if( q2npc::g_arrsQ2Projectiles.find(pInflictor.GetClassname()) >= 0 /*and pAttacker !is pPlayer*/ )
 		{
-			KillPlayer( pPlayer, bitsDamageType );
+			bool bGib = (pPlayer.pev.health - flDamage) < -40;
+			KillPlayer( pPlayer, pAttacker, bitsDamageType, bGib );
 
-			string sDeathMsg = GetDeathMessage( pPlayer.pev.netname, pInflictor.pev.netname, iModeOfDeath ); //pInflictor.pev.weapons
+			//if( pInflictor.pev.weapons != 0 )
+				//iMeansOfDeath = pInflictor.pev.weapons;
+
+			string sDeathMsg = GetDeathMessage( pPlayer.pev.netname, pInflictor.pev.netname, iMeansOfDeath );;
 			g_PlayerFuncs.ClientPrintAll( HUD_PRINTNOTIFY, sDeathMsg );
-			g_Game.AlertMessage( at_notice, "KILLED BY %1, LAUNCHED BY %2, iModeOfDeath: %3\n", pInflictor.GetClassname() );
+			//g_Game.AlertMessage( at_notice, "KILLED BY %1, LAUNCHED BY %2, iMeansOfDeath: %3\n", pInflictor.GetClassname(), pAttacker.pev.netname, iMeansOfDeath );
 
 			return;
 		}
@@ -360,22 +399,23 @@ void ClientObituary( CBasePlayer@ pPlayer, CBaseEntity@ pInflictor, CBaseEntity@
 			{
 				string sDeathMsg;
 
-				KillPlayer( pPlayer, bitsDamageType );
+				bool bGib = (pPlayer.pev.health - flDamage) < -40;
+				KillPlayer( pPlayer, pAttacker, bitsDamageType, bGib );
 
-				if( bitsDamageType & (DMG_ALWAYSGIB + DMG_CRUSH) == (DMG_ALWAYSGIB + DMG_CRUSH) )
-					iModeOfDeath = q2::MOD_TELEFRAG;
+				/*if( bitsDamageType & (DMG_ALWAYSGIB + DMG_CRUSH) == (DMG_ALWAYSGIB + DMG_CRUSH) )
+					iMeansOfDeath = q2::MOD_TELEFRAG;
 				else if( HasFlags(bitsDamageType, DMG_ENERGYBEAM) )
-					iModeOfDeath = q2::MOD_RAILGUN;
-				else if( HasFlags(bitsDamageType, DMG_BULLET) )
+					iMeansOfDeath = q2::MOD_RAILGUN;
+				else */if( HasFlags(bitsDamageType, DMG_BULLET) )
 				{
 					if( pAttacker.pev.weapons == q2::MOD_SHOTGUN )
-						iModeOfDeath = q2::MOD_SHOTGUN;
+						iMeansOfDeath = q2::MOD_SHOTGUN;
 					else if( pAttacker.GetClassname() == "npc_q2tank" or pAttacker.GetClassname() == "npc_q2supertank" or pAttacker.GetClassname() == "npc_q2jorg" )
-						iModeOfDeath = q2::MOD_CHAINGUN;
+						iMeansOfDeath = q2::MOD_CHAINGUN;
 					else
-						iModeOfDeath = q2::MOD_MACHINEGUN;
+						iMeansOfDeath = q2::MOD_MACHINEGUN;
 				}
-				else
+				else if( iMeansOfDeath == q2::MOD_HIT )
 				{
 					if( pAttacker.GetClassname() == "npc_q2flyer" )
 						sDeathMsg = string(pPlayer.pev.netname) + " was cut up by a Flyer's sharp wings\n";
@@ -387,6 +427,8 @@ void ClientObituary( CBasePlayer@ pPlayer, CBaseEntity@ pInflictor, CBaseEntity@
 						sDeathMsg = string(pPlayer.pev.netname) + " was bitch-slapped by an Iron Maiden\n";
 					else if( pAttacker.GetClassname() == "npc_q2berserker" )
 						sDeathMsg = string(pPlayer.pev.netname) + " was smashed by a Berserker\n";
+					else if( pAttacker.GetClassname() == "npc_q2brains" )
+						sDeathMsg = string(pPlayer.pev.netname) + " was sliced to pieces by a Brains\n"; //a Brains ??
 					else if( pAttacker.GetClassname() == "npc_q2gladiator" )
 						sDeathMsg = string(pPlayer.pev.netname) + " was mangled by a Gladiator's claw\n";
 
@@ -396,8 +438,16 @@ void ClientObituary( CBasePlayer@ pPlayer, CBaseEntity@ pInflictor, CBaseEntity@
 
 				string sMonsterName;
 				q2npc::g_dicMonsterNames.get( pAttacker.GetClassname(), sMonsterName );
-				sDeathMsg = GetDeathMessage( pPlayer.pev.netname, sMonsterName, iModeOfDeath );
+				sDeathMsg = GetDeathMessage( pPlayer.pev.netname, sMonsterName, iMeansOfDeath );
 
+				g_PlayerFuncs.ClientPrintAll( HUD_PRINTNOTIFY, sDeathMsg );
+			}
+			else if( pAttacker.pev.FlagBitSet(FL_CLIENT) )
+			{
+				bool bGib = (pPlayer.pev.health - flDamage) < -40;
+				KillPlayer( pPlayer, pAttacker, bitsDamageType, bGib );
+
+				string sDeathMsg = GetDeathMessage( pPlayer.pev.netname, pAttacker.pev.netname, iMeansOfDeath );
 				g_PlayerFuncs.ClientPrintAll( HUD_PRINTNOTIFY, sDeathMsg );
 			}
 
@@ -408,9 +458,9 @@ void ClientObituary( CBasePlayer@ pPlayer, CBaseEntity@ pInflictor, CBaseEntity@
 	}
 }
 
-void KillPlayer( CBasePlayer@ pPlayer, int bitsDamageType )
+void KillPlayer( CBasePlayer@ pPlayer, CBaseEntity@ pKiller, int bitsDamageType, bool bGib = false )
 {
-	if( (!HasFlags(bitsDamageType, DMG_NEVERGIB) and pPlayer.pev.health < -30) or HasFlags(bitsDamageType, DMG_ALWAYSGIB) )
+	if( (!HasFlags(bitsDamageType, DMG_NEVERGIB) and bGib) or HasFlags(bitsDamageType, DMG_ALWAYSGIB) )
 	{
 		pPlayer.GibMonster();
 		pPlayer.pev.effects |= EF_NODRAW;
@@ -418,11 +468,15 @@ void KillPlayer( CBasePlayer@ pPlayer, int bitsDamageType )
 
 	pPlayer.Killed( null, GIB_NOPENALTY );
 	pPlayer.m_iDeaths++;
+
+	if( pKiller !is null )
+		pKiller.pev.frags++;
 }
 
-string GetDeathMessage( string sVictim, string sKiller, int iModeOfDeath )
+string GetDeathMessage( string sVictim, string sKiller, int iMeansOfDeath )
 {
-	switch( iModeOfDeath )
+	//g_Game.AlertMessage( at_notice, "GetDeathMessage: %1 %2 %3\n", sVictim, sKiller, iMeansOfDeath );
+	switch( iMeansOfDeath )
 	{
 		case q2::MOD_TARGET_BLASTER:
 			return sVictim + " got blasted.\n";
@@ -559,8 +613,13 @@ HookReturnCode PlayerKilled( CBasePlayer@ pPlayer, CBaseEntity@ pAttacker, int i
 		pCustom.SetKeyvalue( q2items::QUAD_KVN_TIME, 0.0 );
 		pCustom.SetKeyvalue( q2items::INVUL_KVN, 0 );
 		pCustom.SetKeyvalue( q2items::INVUL_KVN_TIME, 0.0 );
+
+		if( q2items::IsItemActive(pPlayer, q2::IT_ITEM_INVISIBILITY) )
+			q2items::InvisResetPlayer( pPlayer );
+
 		pCustom.SetKeyvalue( q2items::INVIS_KVN, 0 );
 		pCustom.SetKeyvalue( q2items::INVIS_KVN_TIME, 0.0 );
+		pCustom.SetKeyvalue( q2items::INVIS_KVN_FADETIME, 0.0 );
 		pCustom.SetKeyvalue( q2items::BREATHER_KVN, 0 );
 		pCustom.SetKeyvalue( q2items::BREATHER_KVN_SOUND, 0 );
 		pCustom.SetKeyvalue( q2items::BREATHER_KVN_TIME, 0.0 );
@@ -644,6 +703,13 @@ HookReturnCode PlayerPostThink( CBasePlayer@ pPlayer )
 	return HOOK_CONTINUE;
 }
 
+HookReturnCode ClientPutInServer( CBasePlayer@ pPlayer )
+{
+	q2npc::G_Monster_CheckCoopHealthScaling();
+
+	return HOOK_CONTINUE;
+}
+
 HookReturnCode ClientDisconnect( CBasePlayer@ pPlayer )
 {
 	g_Scheduler.SetTimeout( "RemoveKeys", 0.1 );
@@ -668,10 +734,11 @@ void RemoveKeys()
 
 void RunTimedItems( CBasePlayer@ pPlayer )
 {
-	if( pPlayer is null or !pPlayer.IsAlive() ) return;
+	if( pPlayer is null or !pPlayer.IsAlive() or !pPlayer.IsConnected() ) return;
 
 	q2items::RunRebreather( pPlayer );
 	q2items::RunEnvirosuit( pPlayer );
+	q2items::RunInvisibility( pPlayer );
 }
 
 void DoPowerArmorEffects( CBasePlayer@ pPlayer )
@@ -798,11 +865,6 @@ void q2_PlayPlayerJumpSounds( EHandle& in ePlayer )
 		if( tr.flFraction < 1.0 )
 			g_SoundSystem.EmitSound( pPlayer.edict(), CHAN_VOICE, GetPlayerSoundFolder(pPlayer, "jump1.wav"), 1, ATTN_NORM );
 	}
-}
-
-void q2DoFootstepSounds( CBasePlayer@ pPlayer )
-{
-	
 }
 
 void PrecachePlayerSounds()
@@ -1079,6 +1141,11 @@ bool IsCoop()
 	return g_PlayerFuncs.GetNumPlayers() > 1;
 }
 
+bool IsAlly( CBaseEntity@ pEntity, CBaseEntity@ pTarget )
+{
+	return pEntity.IRelationship( pTarget ) <= R_NO;
+}
+
 bool HasFlags( int iFlagVariable, int iFlags )
 {
 	return (iFlagVariable & iFlags) != 0;
@@ -1088,40 +1155,120 @@ bool ShouldEntitySpawn( CBaseEntity@ pEntity )
 {
 	if( HasFlags(pEntity.pev.spawnflags, SF_NOT_IN_DEATHMATCH) and PVP )
 	{
-		g_Game.AlertMessage( at_notice, "SP-only item tried to spawn in deathmatch: %1\n", pEntity.GetClassname() );
+		//g_Game.AlertMessage( at_notice, "SP-only item tried to spawn in deathmatch: %1\n", pEntity.GetClassname() );
 		return false;
 	}
 
 	if( (pEntity.pev.spawnflags & SF_NOT_IN_SINGLEPLAYER) == SF_NOT_IN_SINGLEPLAYER and !PVP )
 	{
-		g_Game.AlertMessage( at_notice, "DM-only item tried to spawn in singleplayer: %1\n", pEntity.GetClassname() );
+		//g_Game.AlertMessage( at_notice, "DM-only item tried to spawn in singleplayer: %1\n", pEntity.GetClassname() );
 		return false;
 	}
 
-	if( HasFlags(pEntity.pev.spawnflags, SF_NOT_IN_HARD) and q2npc::g_iDifficulty >= q2npc::DIFF_HARD )
+	if( HasFlags(pEntity.pev.spawnflags, SF_NOT_IN_HARD) and q2npc::g_iDifficulty >= q2::DIFF_HARD )
 	{
-		g_Game.AlertMessage( at_notice, "SF_NOT_IN_HARD item tried to spawn in >= DIFF_HARD: %1\n", pEntity.GetClassname() );
+		//g_Game.AlertMessage( at_notice, "SF_NOT_IN_HARD item tried to spawn in >= DIFF_HARD: %1\n", pEntity.GetClassname() );
 		return false;
 	}
 
-	if( HasFlags(pEntity.pev.spawnflags, SF_NOT_IN_NORMAL) and q2npc::g_iDifficulty == q2npc::DIFF_NORMAL )
+	if( HasFlags(pEntity.pev.spawnflags, SF_NOT_IN_NORMAL) and q2npc::g_iDifficulty == q2::DIFF_NORMAL )
 	{
-		g_Game.AlertMessage( at_notice, "SF_NOT_IN_NORMAL item tried to spawn in >= DIFF_NORMAL: %1\n", pEntity.GetClassname() );
+		//g_Game.AlertMessage( at_notice, "SF_NOT_IN_NORMAL item tried to spawn in >= DIFF_NORMAL: %1\n", pEntity.GetClassname() );
 		return false;
 	}
 
-	if( HasFlags(pEntity.pev.spawnflags, SF_NOT_IN_EASY) and q2npc::g_iDifficulty == q2npc::DIFF_EASY )
+	if( HasFlags(pEntity.pev.spawnflags, SF_NOT_IN_EASY) and q2npc::g_iDifficulty == q2::DIFF_EASY )
 	{
-		g_Game.AlertMessage( at_notice, "SF_NOT_IN_EASY item tried to spawn in >= DIFF_EASY: %1\n", pEntity.GetClassname() );
+		//g_Game.AlertMessage( at_notice, "SF_NOT_IN_EASY item tried to spawn in >= DIFF_EASY: %1\n", pEntity.GetClassname() );
 		return false;
 	}
 
 	return true;
 }
 
+void Quake2Settings( const CCommand@ args )
+{
+	CBasePlayer@ pPlayer = g_ConCommandSystem.GetCurrentPlayer();
+
+	if( args.Arg(0) == "q2_infinite_ammo" and !q2::USE_QUAKE2_WEAPONS )
+	{
+		g_PlayerFuncs.ClientPrint( pPlayer, HUD_PRINTCONSOLE, "Quake 2 Weapons are disabled\n" );
+		return;
+	}
+
+	if( (args.Arg(0) == "q2skill" or args.Arg(0) == "q2chaos") and !q2::USE_QUAKE2_NPCS )
+	{
+		g_PlayerFuncs.ClientPrint( pPlayer, HUD_PRINTCONSOLE, "Quake 2 NPCs are disabled\n" );
+		return;
+	}
+
+	if( args.ArgC() < 2 ) //If no args are supplied
+	{
+		if( args.Arg(0) == "q2skill" )
+			g_PlayerFuncs.ClientPrint( pPlayer, HUD_PRINTCONSOLE, "\"q2skill\" is \"" + q2npc::g_iDifficulty + "\"\n" );
+		else if( args.Arg(0) == "q2chaos" )
+			g_PlayerFuncs.ClientPrint( pPlayer, HUD_PRINTCONSOLE, "\"q2chaos\" is \"" + q2npc::g_iChaosMode + "\"\n" );
+		else if( args.Arg(0) == "q2_infinite_ammo" )
+			g_PlayerFuncs.ClientPrint( pPlayer, HUD_PRINTCONSOLE, "\"q2_infinite_ammo\" is \"" + cvar_InfiniteAmmo.GetInt() + "\"\n" );
+		else if( args.Arg(0) == "q2_coop_health_scaling" )
+			g_PlayerFuncs.ClientPrint( pPlayer, HUD_PRINTCONSOLE, "\"q2_coop_health_scaling\" is \"" + cvar_CoopHealthScaling.GetInt() + "\"\n" );
+		else if( args.Arg(0) == "q2deathmatch" )
+			g_PlayerFuncs.ClientPrint( pPlayer, HUD_PRINTCONSOLE, "\"q2deathmatch\" is \"" + q2::PVP + "\"\n" );
+	}
+	else if( args.ArgC() == 2 ) //If one arg is supplied (value to set)
+	{
+		if( args.Arg(0) == "q2skill" and Math.clamp(0, q2::DIFF_LAST-1, atoi(args.Arg(1))) != q2npc::g_iDifficulty )
+		{
+			q2npc::g_iDifficulty = Math.clamp( 0, q2::DIFF_LAST-1, atoi(args.Arg(1)) );
+			g_PlayerFuncs.ClientPrint( pPlayer, HUD_PRINTCONSOLE, "\"q2skill\" changed to \"" + q2npc::g_iDifficulty + "\"\n" );
+		}
+		else if( args.Arg(0) == "q2chaos" and Math.clamp(0, q2::CHAOS_LAST-1, atoi(args.Arg(1))) != q2npc::g_iChaosMode )
+		{
+			q2npc::g_iChaosMode = Math.clamp( 0, q2::CHAOS_LAST-1, atoi(args.Arg(1)) );
+			g_PlayerFuncs.ClientPrint( pPlayer, HUD_PRINTCONSOLE, "\"q2chaos\" changed to \"" + q2npc::g_iChaosMode + "\"\n" );
+		}
+		else if( args.Arg(0) == "q2_infinite_ammo" and Math.clamp(0, 1, atoi(args.Arg(1))) != cvar_InfiniteAmmo.GetInt() )
+		{
+			cvar_InfiniteAmmo.SetInt( Math.clamp(0, 1, atoi(args.Arg(1))) );
+			g_PlayerFuncs.ClientPrint( pPlayer, HUD_PRINTCONSOLE, "\"q2_infinite_ammo\" changed to \"" + cvar_InfiniteAmmo.GetInt() + "\"\n" );
+		}
+		else if( args.Arg(0) == "q2_coop_health_scaling" and Math.clamp(0.0, 1.0, atof(args.Arg(1))) != cvar_CoopHealthScaling.GetFloat() )
+		{
+			cvar_CoopHealthScaling.SetFloat( Math.clamp(0.0, 1.0, atof(args.Arg(1))) );
+			g_PlayerFuncs.ClientPrint( pPlayer, HUD_PRINTCONSOLE, "\"q2_coop_health_scaling\" changed to \"" + cvar_CoopHealthScaling.GetInt() + "\"\n" );
+		}
+		else if( args.Arg(0) == "q2deathmatch" )
+		{
+			bool bNewValue =  ( atoi(args.Arg(1)) > 0 );
+			if( bNewValue != q2::PVP )
+			{
+				q2::PVP = bNewValue;
+				g_PlayerFuncs.ClientPrint( pPlayer, HUD_PRINTCONSOLE, "\"q2deathmatch\" changed to \"" + q2::PVP + "\"\n" );
+			}
+		}
+	}
+}
+
+void Quake2GiveAll( const CCommand@ args )
+{
+	CBasePlayer@ pPlayer = g_ConCommandSystem.GetCurrentPlayer();
+
+	if( q2::USE_QUAKE2_WEAPONS )
+	{
+		for( uint i = 0; i < q2weapons::g_arrsQ2Weapons.length(); i++ )
+		{
+			if( pPlayer.HasNamedPlayerItem(q2weapons::g_arrsQ2Weapons[i]) is null )
+				pPlayer.GiveNamedItem( q2weapons::g_arrsQ2Weapons[i] );
+		}
+	}
+}
+
 } //end of namespace q2
 
 /* FIXME
+	Players take double damage from each other
+	The knockback from weapons is too high in DM
+	Death messages in DM don't work as they should (eg: machinegun and chaingun, splash damage from rockets and grenades)
 */
 
 /* TODO
@@ -1131,5 +1278,5 @@ bool ShouldEntitySpawn( CBaseEntity@ pEntity )
 
 	Add q2 prefix to all items ??
 
-	Change T_RadiusDamage to use damageflags ??
+	IsSlime and IsLava
 */

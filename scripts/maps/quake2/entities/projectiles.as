@@ -10,6 +10,7 @@ const string BFG_EXPLOSION1			= "sprites/quake2/s_bfg3.spr"; //when exploding on
 const string BFG_EXPLOSION2			= "sprites/quake2/s_bfg2.spr"; //when hitting enemies with the larger aoe
 const string BFG_BEAM						= "sprites/quake2/bfg_beam.spr";
 const float BFG_DAMAGE1					= 200.0; //when exploding on touch, deals direct damage to target hit, and radius damage
+const float BFG_DAMAGE_LASER			= 10.0;
 const float BFG_RADIUS1					= 100.0; //when exploding on touch
 
 const array<string> pExplosionSprites = 
@@ -22,6 +23,8 @@ const array<string> pExplosionSprites =
 
 class q2laser : ScriptBaseEntity
 {
+	protected float m_flRemoveTime;
+
 	protected EHandle m_hGlow;
 	protected CSprite@ m_pGlow
 	{
@@ -40,7 +43,9 @@ class q2laser : ScriptBaseEntity
 		pev.movetype = MOVETYPE_FLYMISSILE;
 		pev.solid = SOLID_BBOX;
 		pev.effects |= EF_DIMLIGHT;
-		pev.scale = 0.9;
+		//pev.scale = 0.9;
+
+		m_flRemoveTime = g_Engine.time + 2.0;
 
 		Ignite();
 	}
@@ -56,18 +61,31 @@ class q2laser : ScriptBaseEntity
 
 	void Ignite()
 	{
-		@m_pGlow = g_EntityFuncs.CreateSprite( "sprites/blueflare1.spr", pev.origin, false ); 
-		m_pGlow.SetTransparency( 3, 50, 20, 0, 255, 14 );
-		m_pGlow.SetScale( (pev.weapons == q2::MOD_HYPERBLASTER) ? 0.125 : 0.5 );
-		m_pGlow.SetAttachment( self.edict(), 0 );
+		if( pev.frags != 1.0 )
+		{
+			@m_pGlow = g_EntityFuncs.CreateSprite( "sprites/blueflare1.spr", pev.origin, false ); 
+			m_pGlow.SetTransparency( 3, 50, 20, 0, 255, 14 );
+			m_pGlow.SetScale( (pev.weapons == q2::MOD_HYPERBLASTER) ? 0.125 : 0.5 );
+			m_pGlow.SetAttachment( self.edict(), 0 );
+		}
 
-		g_SoundSystem.EmitSoundDyn( self.edict(), CHAN_VOICE, "quake2/misc/lasfly.wav", 0.05, ATTN_NORM, SND_FORCE_LOOP );
+		if( pev.skin != 2 )
+			g_SoundSystem.EmitSoundDyn( self.edict(), CHAN_VOICE, "quake2/misc/lasfly.wav", 0.05, ATTN_NORM, SND_FORCE_LOOP );
+
 		SetThink( ThinkFunction(this.FlyThink) );
 		pev.nextthink = g_Engine.time + 0.1;
 	}
 
 	void FlyThink()
 	{
+		if( g_Engine.time >= m_flRemoveTime )
+		{
+			g_SoundSystem.StopSound( self.edict(), CHAN_VOICE, "quake2/misc/lasfly.wav" );
+			g_EntityFuncs.Remove( m_pGlow );
+			g_EntityFuncs.Remove( self );
+			return;
+		}
+
 		pev.angles = Math.VecToAngles( pev.velocity );
 
 		NetworkMessage m1( MSG_PVS, NetworkMessages::SVC_TEMPENTITY );
@@ -115,30 +133,36 @@ class q2laser : ScriptBaseEntity
 
 		if( pOther !is null )
 		{
+			int iMeansOfDeath = pev.weapons;
+
 			if( !pOther.IsBSPModel() )
 			{
 				if( pOther.pev.takedamage != 0 )
 				{
 					g_WeaponFuncs.SpawnBlood( pev.origin, pOther.BloodColor(), pev.dmg );
-					pOther.TakeDamage( self.pev, pev.owner.vars, pev.dmg, DMG_ENERGYBEAM );
+					TraceResult tr = g_Utility.GetGlobalTrace();
+					q2::T_Damage( pOther, self, g_EntityFuncs.Instance(pev.owner), pev.velocity, pev.origin, tr.vecPlaneNormal, pev.dmg, 1, q2::DAMAGE_ENERGY, iMeansOfDeath );
+					//T_Damage(other, self, self->owner, self->velocity, self->s.origin, tr.plane.normal, self->dmg, 1, DAMAGE_ENERGY, static_cast<mod_id_t>(self->style));
+					//pOther.TakeDamage( self.pev, pev.owner.vars, pev.dmg, DMG_ENERGYBEAM );
 
-					if( pev.weapons != q2::MOD_UNKNOWN )
+					/*if( pev.weapons != q2::MOD_UNKNOWN )
 					{
 						CustomKeyvalues@ pCustom = pOther.GetCustomKeyvalues();
 						pCustom.SetKeyvalue( q2::KVN_MOD, pev.weapons );
-					}
+					}*/
 				}
 			}
 			else
 			{
 				Explode();
-				TraceResult tr;
-				tr = g_Utility.GetGlobalTrace();
+				TraceResult tr = g_Utility.GetGlobalTrace();
 				g_SoundSystem.EmitSound( self.edict(), CHAN_BODY, "quake2/weapons/lashit.wav", 0.8, ATTN_NORM );
 				g_Utility.DecalTrace( tr, DECAL_BIGSHOT4 + Math.RandomLong(0,1) );
 
 				if( pOther.pev.takedamage != 0 )
-					pOther.TakeDamage( self.pev, pev.owner.vars, pev.dmg, DMG_ENERGYBEAM );
+					q2::T_Damage( pOther, self, g_EntityFuncs.Instance(pev.owner), pev.velocity, pev.origin, tr.vecPlaneNormal, pev.dmg, 1, q2::DAMAGE_ENERGY, iMeansOfDeath );
+					//T_Damage(other, self, self->owner, self->velocity, self->s.origin, tr.plane.normal, self->dmg, 1, DAMAGE_ENERGY, static_cast<mod_id_t>(self->style));
+					//pOther.TakeDamage( self.pev, pev.owner.vars, pev.dmg, DMG_ENERGYBEAM );
 			}
 		}
 
@@ -168,8 +192,8 @@ class q2laser : ScriptBaseEntity
 	{
 		SetThink( null );
 		g_SoundSystem.StopSound( self.edict(), CHAN_VOICE, "quake2/misc/lasfly.wav" );
-		g_EntityFuncs.Remove( self );
 		g_EntityFuncs.Remove( m_pGlow );
+		g_EntityFuncs.Remove( self );
 	}
 
 	void UpdateOnRemove()
@@ -323,7 +347,7 @@ class q2grenade : ScriptBaseEntity
 
 			mod = (pev.weapons == 1) ? q2::MOD_HANDGRENADE : q2::MOD_GRENADE;
 
-			q2::T_Damage( m_hEnemy.GetEntity(), self, g_EntityFuncs.Instance(pev.owner), vecDir, pev.origin, g_vecZero, flPoints, flPoints, 0, mod ); //DAMAGE_RADIUS
+			q2::T_Damage( m_hEnemy.GetEntity(), self, g_EntityFuncs.Instance(pev.owner), vecDir, pev.origin, g_vecZero, flPoints, flPoints, q2::DAMAGE_RADIUS, mod );
 		}
 
 		if( pev.weapons == 1 and pev.dmgtime == 0 )
@@ -333,7 +357,8 @@ class q2grenade : ScriptBaseEntity
 		else
 			mod = q2::MOD_G_SPLASH;
 
-		q2::T_RadiusDamage( self, g_EntityFuncs.Instance(pev.owner), pev.dmg, m_hEnemy.GetEntity(), m_flDamageRadius, DMG_BLAST | DMG_LAUNCH, mod ); //DMG_BLAST needed ??
+		//q2::T_RadiusDamage( self, g_EntityFuncs.Instance(pev.owner), pev.dmg, m_hEnemy.GetEntity(), m_flDamageRadius, DMG_BLAST | DMG_LAUNCH, mod ); //DMG_BLAST needed ??
+		q2::T_RadiusDamage( self, g_EntityFuncs.Instance(pev.owner), pev.dmg, m_hEnemy.GetEntity(), m_flDamageRadius, q2::DAMAGE_NONE, mod );
 
 		vecOrigin = pev.origin + pev.velocity * -0.02; //VectorMA (ent->s.origin, -0.02, ent->velocity, vecOrigin);
 
@@ -366,6 +391,10 @@ class q2grenade : ScriptBaseEntity
 
 class q2rocket : ScriptBaseEntity
 {
+	protected float m_flRemoveTime;
+	float m_flRadiusDamage;
+	float m_flDamageRadius;
+
 	protected EHandle m_hEnemy;
 	protected Vector m_vecMoveDir;
 
@@ -403,6 +432,7 @@ class q2rocket : ScriptBaseEntity
 			return;
 		}
 
+		m_flRemoveTime = g_Engine.time + 8000 / pev.speed;
 		SetThink( ThinkFunction(this.RocketThink) );
 		pev.nextthink = g_Engine.time + 0.1;
 	}
@@ -423,6 +453,13 @@ class q2rocket : ScriptBaseEntity
 
 	void RocketThink()
 	{
+		if( g_Engine.time >= m_flRemoveTime )
+		{
+			g_SoundSystem.StopSound( self.edict(), CHAN_VOICE, "quake2/weapons/rockfly.wav" );
+			g_EntityFuncs.Remove( self );
+			return;
+		}
+
 		pev.angles = Math.VecToAngles( pev.velocity );
 		pev.nextthink = g_Engine.time + 0.1;
 	}
@@ -541,13 +578,15 @@ class q2rocket : ScriptBaseEntity
 		GetSoundEntInstance().InsertSound( bits_SOUND_COMBAT, vecOrigin, NORMAL_EXPLOSION_VOLUME, 3.0, g_EntityFuncs.Instance(pev.owner) );
 
 		//I'm using this to get rocket jumping working properly
-		q2::T_RadiusDamage( self, g_EntityFuncs.Instance(pev.owner), 120.0, pOther, 120.0, DMG_BLAST | DMG_LAUNCH, q2::MOD_R_SPLASH );
+		//q2::T_RadiusDamage( self, g_EntityFuncs.Instance(pev.owner), 120.0, pOther, 120.0, q2::DAMAGE_NONE, q2::MOD_R_SPLASH );
+		q2::T_RadiusDamage( self, g_EntityFuncs.Instance(pev.owner), m_flRadiusDamage, pOther, m_flDamageRadius, q2::DAMAGE_NONE, q2::MOD_R_SPLASH );
 
 		vecOrigin = pev.origin + tr.vecPlaneNormal;
 
 		if( pOther.pev.takedamage != DAMAGE_NO )
 		{
-			q2::T_Damage( pOther, self, g_EntityFuncs.Instance(pev.owner), pev.velocity, pev.origin, tr.vecPlaneNormal, pev.dmg, 0, DMG_GENERIC, q2::MOD_ROCKET );
+			q2::T_Damage( pOther, self, g_EntityFuncs.Instance(pev.owner), pev.velocity, pev.origin, tr.vecPlaneNormal, pev.dmg, 0, q2::DAMAGE_NONE, q2::MOD_ROCKET );
+
 			//if( !(pOther.pev.FlagBitSet(FL_CLIENT) and !q2::PVP) ) //deals damage to players otherwise
 				//pOther.TakeDamage( self.pev, pev.owner.vars, pev.dmg, DMG_GENERIC );
 		}
@@ -720,6 +759,8 @@ class q2railbeam : ScriptBaseEntity
 
 class q2bfg : ScriptBaseEntity
 {
+	protected float m_flRemoveTime;
+
 	//The sprite won't animate otherwise
 	protected EHandle m_hBFG;
 	protected CSprite@ m_pBFG
@@ -751,6 +792,8 @@ class q2bfg : ScriptBaseEntity
 		m_pBFG.SetTransparency( 3, 0, 50, 20, 255, 14 );
 		m_pBFG.SetScale( 2 );
 		m_pBFG.SetAttachment( self.edict(), 0 );
+
+		m_flRemoveTime = g_Engine.time + 8000 / pev.speed;
 	}
 
 	void Precache()
@@ -766,6 +809,13 @@ class q2bfg : ScriptBaseEntity
 
 	void FlyThink()
 	{
+		if( g_Engine.time >= m_flRemoveTime )
+		{
+			g_SoundSystem.StopSound( self.edict(), CHAN_VOICE, "quake2/weapons/bfg__l1a.wav" );
+			g_EntityFuncs.Remove( self );
+			return;
+		}
+
 		if( g_Engine.time > m_flLaserDamageDelay )
 		{
 			CBaseEntity@ pEntity = null;
@@ -801,7 +851,13 @@ CL_ParseLaser()
 colors = 0xd0d1d2d3
 l.ent.skinnum = (colors >> ((rand() % 4)*8)) & 0xff;
 */
-						pEntity.TakeDamage( self.pev, pev.owner.vars, 10, DMG_ENERGYBEAM | DMG_ALWAYSGIB );
+						//pEntity.TakeDamage( self.pev, pev.owner.vars, 10, DMG_ENERGYBEAM | DMG_ALWAYSGIB );
+
+						Vector vecPoint = (pEntity.pev.absmin + pEntity.pev.absmax) * 0.5;
+
+						Vector vecDir = (vecPoint - pev.origin).Normalize();
+
+						q2::T_Damage( pEntity, self, g_EntityFuncs.Instance(pev.owner), vecDir, vecPoint, g_vecZero, BFG_DAMAGE_LASER, 1, q2::DAMAGE_ENERGY, q2::MOD_BFG_LASER );
 					}
 				}
 			}
@@ -843,7 +899,8 @@ l.ent.skinnum = (colors >> ((rand() % 4)*8)) & 0xff;
 
 		//g_WeaponFuncs.RadiusDamage( pev.origin, self.pev, pevOwner, pev.dmg, 256, CLASS_NONE, DMG_BLAST|DMG_ALWAYSGIB ); //doesn't properly do aoe dmg (try spawning several mobs on the same spot)
 		//q2::T_RadiusDamage( self, g_EntityFuncs.Instance(pevOwner), pev.dmg, pOther, 256.0, DMG_BLAST|DMG_ALWAYSGIB/*, MOD_R_SPLASH*/ );
-		q2::T_RadiusDamage( self, g_EntityFuncs.Instance(pev.owner), BFG_DAMAGE1, pOther, BFG_RADIUS1, DMG_BLAST|DMG_ALWAYSGIB|DMG_LAUNCH, q2::MOD_BFG_BLAST );
+		//q2::T_RadiusDamage( self, g_EntityFuncs.Instance(pev.owner), BFG_DAMAGE1, pOther, BFG_RADIUS1, DMG_BLAST|DMG_ALWAYSGIB|DMG_LAUNCH, q2::MOD_BFG_BLAST );
+		q2::T_RadiusDamage( self, g_EntityFuncs.Instance(pev.owner), BFG_DAMAGE1, pOther, BFG_RADIUS1, q2::DAMAGE_ENERGY, q2::MOD_BFG_BLAST );
 
 		// core explosion - prevents firing it into the wall/floor
 		if( pOther.pev.takedamage != DAMAGE_NO )
@@ -852,7 +909,8 @@ l.ent.skinnum = (colors >> ((rand() % 4)*8)) & 0xff;
 				//pOther.TakeDamage( self.pev, pevOwner, pev.dmg, DMG_BLAST|DMG_ALWAYSGIB );
 
 			TraceResult tr = g_Utility.GetGlobalTrace();
-			q2::T_Damage( pOther, self, g_EntityFuncs.Instance(pev.owner), pev.velocity, pev.origin, tr.vecPlaneNormal, BFG_DAMAGE1, 0, DMG_ENERGYBEAM, q2::MOD_BFG_BLAST );
+			//q2::T_Damage( pOther, self, g_EntityFuncs.Instance(pev.owner), pev.velocity, pev.origin, tr.vecPlaneNormal, BFG_DAMAGE1, 0, DMG_ENERGYBEAM, q2::MOD_BFG_BLAST );
+			q2::T_Damage( pOther, self, g_EntityFuncs.Instance(pev.owner), pev.velocity, pev.origin, tr.vecPlaneNormal, BFG_DAMAGE1, 0, q2::DAMAGE_ENERGY, q2::MOD_BFG_BLAST );
 		}
 
 		g_SoundSystem.StopSound( self.edict(), CHAN_VOICE, "quake2/weapons/bfg__l1a.wav" );
@@ -882,7 +940,7 @@ l.ent.skinnum = (colors >> ((rand() % 4)*8)) & 0xff;
 			g_EntityFuncs.Remove( m_pBFG );
 
 		SetThink( ThinkFunction(this.bfg_explode) );
-		pev.nextthink = g_Engine.time + q2::FRAMETIME; //10_hz
+		pev.nextthink = g_Engine.time + 0.1; //10_hz
 	}
 
 	void bfg_explode()
@@ -901,10 +959,10 @@ l.ent.skinnum = (colors >> ((rand() % 4)*8)) & 0xff;
 			if( pEntity.edict() is pev.owner )
 				continue;
 
-			if( !q2::CanDamage(EHandle(pEntity), EHandle(self)) )
+			if( !q2::CanDamage(pEntity, self) )
 				continue;
 
-			if( !q2::CanDamage(EHandle(pEntity), EHandle(g_EntityFuncs.Instance(pev.owner))) )
+			if( g_EntityFuncs.Instance(pev.owner) !is null and !q2::CanDamage(pEntity, g_EntityFuncs.Instance(pev.owner)) )
 				continue;
 
 			vecWhat = pEntity.pev.mins + pEntity.pev.maxs; //VectorAdd (pEntity->mins, pEntity->maxs, vecWhat);

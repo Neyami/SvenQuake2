@@ -202,11 +202,11 @@ void HelpComputer( CBasePlayer@ pPlayer )
 void ShowHelpComputerInfo( CBasePlayer@ pPlayer )
 {
 	string sDifficultyName;
-	if( q2npc::g_iDifficulty == q2npc::DIFF_EASY )
+	if( q2npc::g_iDifficulty == q2::DIFF_EASY )
 		sDifficultyName = "Easy";
-	else if( q2npc::g_iDifficulty == q2npc::DIFF_NORMAL )
+	else if( q2npc::g_iDifficulty == q2::DIFF_NORMAL )
 		sDifficultyName = "Medium";
-	else if( q2npc::g_iDifficulty == q2npc::DIFF_HARD )
+	else if( q2npc::g_iDifficulty == q2::DIFF_HARD )
 		sDifficultyName = "Hard";
 	else
 		sDifficultyName = "Nightmare";

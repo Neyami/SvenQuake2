@@ -1,7 +1,9 @@
-const float Q2_MELEE_DISTANCE = 80.0; //50
-const float Q2_RANGE_MELEE = 60.0; //20
-const float Q2_RANGE_NEAR = 500.0;
-const float Q2_RANGE_MID = 1000.0;
+const float Q2_MELEE_DISTANCE		= 80.0;
+const float Q2_MELEE_DISTANCE_RR	= 64.0; //50 is too short
+const float Q2_RANGE_MELEE				= 60.0; //20
+const float Q2_RANGE_NEAR				= 440.0; //500
+const float Q2_RANGE_MID					= 1000.0;
+const float Q2_STEPSIZE					= 18.0;
 
 enum steptype_e
 {
@@ -19,34 +21,123 @@ enum steptype_e
 	STEP_SNOW
 };
 
+class monsterinfo_t
+{
+	//mmove_t@	currentmove;
+	int64							aiflags;
+	/*int							nextframe;
+	float							scale;
+
+	bool							has_search;
+	//funcdef void	stand(); //CBaseEntity@ self 
+	//funcdef void	idle(); //CBaseEntity@ self
+	//funcdef void search( CBaseEntity@ self );
+	//funcdef void walk( CBaseEntity@ self );
+	//funcdef void	run(); //CBaseEntity@ self
+	//funcdef void dodge( CBaseEntity@ self, CBaseEntity@ other, float eta );
+	//funcdef void attack( CBaseEntity@ self );
+	//funcdef void melee( CBaseEntity@ self );
+	//funcdef void	sight( CBaseEntity@ other ); //CBaseEntity@ self, 
+	//funcdef void checkattack( CBaseEntity@ self );
+
+	float							pausetime;
+	float							attack_finished;
+
+	Vector						saved_goal;
+	float							search_time;
+	float							trail_time;
+	Vector						last_sighting;
+	int							attack_state;
+	bool							lefty;
+	float							idle_time;
+	int							linkcount;*/
+
+	int							power_armor_type;
+	int							power_armor_power;
+
+	int							medicTries;
+	EHandle					badMedic1, badMedic2; // these medics have declared this monster "unhealable"
+	EHandle					healer;
+
+	// used by the spawners to not spawn too much and keep track of #s of monsters spawned
+	int							monster_slots; // nb: for spawned monsters, this is how many slots we took from our commander
+	int							monster_used;
+	EHandle					commander;
+
+	float							melee_debounce_time; // don't melee until this time has passed 
+	float							base_health; // health that we had on spawn, before any co-op adjustments
+	int							health_scaling; // number of players we've been scaled up to 
+
+	float							surprise_time;
+	/*//PathInfo				nav_path; // if AI_PATHING, this is where we are trying to reach 
+
+	// alternate flying mechanics
+	float							fly_max_distance, fly_min_distance; // how far we should try to stay
+	float							fly_acceleration; // accel/decel speed
+	float							fly_speed; // max speed from flying
+	Vector						fly_ideal_position; // ideally where we want to end up to hover, relative to our target if not pinned
+	float							fly_position_time; // if <= level.time, we can try changing positions //gtime_t
+	bool							fly_buzzard, fly_above; // orbit around all sides of their enemy, not just the sides
+	bool							fly_pinned; // whether we're currently pinned to ideal position (made absolute)
+	bool							fly_thrusters; // slightly different flight mechanics, for melee attacks
+	float							fly_recovery_time; //gtime_t // time to try a new dir to get away from hazards
+	Vector						fly_recovery_dir;*/
+
+	float							react_to_damage_time;
+
+	reinforcement_list_t	reinforcements; 
+	array<uint8>				chosen_reinforcements; // readied for spawn; 255 is value for none //std::array<uint8_t, MAX_REINFORCEMENTS>
+
+	monsterinfo_t() {} // Constructor (optional)
+}
+
+class reinforcement_t
+{
+	string classname;
+	int strength;
+	Vector mins, maxs;
+}
+
+class reinforcement_list_t
+{
+	array<reinforcement_t@> reinforcements;
+	int num_reinforcements;
+}
+
+const int MAX_REINFORCEMENTS = 5; // max number of spawns we can do at once.
+const float inverse_log_slots = pow( 2, MAX_REINFORCEMENTS );
+
 class CBaseQ2NPC : ScriptBaseMonsterEntity
 {
 	protected bool m_bRerelease = true; //should monsters have stuff from the rerelease of Quake 2 ?
 
-	protected int m_iSpawnFlags;
+	monsterinfo_t monsterinfo;
 
-	protected float m_flMeleeCooldown;
-	protected float m_flGibHealth;
+	int m_iSpawnFlags;
+	int m_iMonsterFlags; //edict->flags
+	int m_iEffects;
+
+	float m_flGibHealth;
 	protected float m_flAttackFinished;
 	protected float m_flIdleTime;
 	protected float m_flNextFidget;
 	protected float m_flHeatTurnRate; //for heat-seeking rockets
 	protected float m_flHealthMultiplier = 1.0;
 	protected float m_flPainDebounceTime;
+	protected float m_flFlySoundDebounceTime;
 	protected float m_flTriggeredSpawn;
 
 	protected int m_iStepLeft;
 	protected int m_iWeaponType;
 
-	protected int m_iPowerArmorType;
-	protected int m_iPowerArmorPower;
 	protected float m_flArmorEffectOff;
 
 	protected string m_sItemDrop;
-	protected string m_sItemTarget;
-	protected string m_sDeathTarget;
-	protected string m_sHealthTarget;
+	string m_sItemTarget;
+	string m_sDeathTarget;
+	string m_sHealthTarget;
 	protected bool m_bHasBeenCounted;
+	protected bool m_bSound;
 
 	protected Vector m_vecAttackDir; //g_vecAttackDir
 
@@ -70,17 +161,17 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		else if( szKey == "power_armor_type" )
 		{
 			if( atoi(szValue) == 1 )
-				m_iPowerArmorType = q2npc::POWER_ARMOR_SCREEN;
+				monsterinfo.power_armor_type = q2::POWER_ARMOR_SCREEN;
 			else if( atoi(szValue) == 2 )
-				m_iPowerArmorType = q2npc::POWER_ARMOR_SHIELD;
+				monsterinfo.power_armor_type = q2::POWER_ARMOR_SHIELD;
 			else
-				m_iPowerArmorType = q2npc::POWER_ARMOR_NONE;
+				monsterinfo.power_armor_type = q2::POWER_ARMOR_NONE;
 
 			return true;
 		}
 		else if( szKey == "power_armor_power" )
 		{
-			m_iPowerArmorPower = atoi( szValue );
+			monsterinfo.power_armor_power = atoi( szValue );
 
 			return true;
 		}
@@ -108,6 +199,12 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 
 			return true;
 		}
+		else if( szKey == "weapontype" )
+		{
+			m_iWeaponType = atoi( szValue );
+
+			return true;
+		}
 		else if( MonsterKeyValue(szKey, szValue) )
 			return true;
 		else
@@ -124,12 +221,12 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 			return;
 		}
 
-		if( q2npc::g_iChaosMode == q2npc::CHAOS_LEVEL1 )
+		if( q2npc::g_iChaosMode == q2::CHAOS_LEVEL1 )
 		{
-			if( q2npc::g_iDifficulty < q2npc::DIFF_NIGHTMARE )
-				m_iWeaponType = Math.RandomLong( q2npc::WEAPON_BULLET, q2npc::WEAPON_RAILGUN );
+			if( q2npc::g_iDifficulty < q2::DIFF_NIGHTMARE )
+				m_iWeaponType = Math.RandomLong( q2::WEAPON_BULLET, q2::WEAPON_RAILGUN );
 			else
-				m_iWeaponType = Math.RandomLong( q2npc::WEAPON_BULLET, q2npc::WEAPON_BFG );
+				m_iWeaponType = Math.RandomLong( q2::WEAPON_BULLET, q2::WEAPON_BFG );
 		}
 
 		m_iSpawnFlags = pev.spawnflags;
@@ -137,10 +234,10 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 
 		MonsterSpawn();
 
-		if( !self.IsPlayerAlly() )
+		if( !HasFlags(monsterinfo.aiflags, q2::AI_DO_NOT_COUNT) and !self.IsPlayerAlly() )
 			q2::g_iTotalMonsters++;
 
-		if( HasFlags(m_iSpawnFlags, q2npc::SPAWNFLAG_MONSTER_TRIGGER_SPAWN) )
+		if( HasFlags(m_iSpawnFlags, q2::SPAWNFLAG_MONSTER_TRIGGER_SPAWN) )
 		{
 			pev.nextthink = 0;
 			pev.flags |= FL_NOTARGET;
@@ -149,6 +246,15 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 			pev.solid = SOLID_NOT;
 			pev.movetype = MOVETYPE_NONE;
 		}
+
+		q2npc::G_Monster_ScaleCoopHealth( self );
+
+		// Paril: monsters' old default viewheight (25)
+		// is all messed up for certain monsters. Calculate
+		// from maxs to make a bit more sense.
+		pev.view_ofs.z = pev.maxs.z - 8.0;
+
+		g_EntityFuncs.SetOrigin( self, pev.origin ); //??
 	}
 
 	void MonsterSpawn() { }
@@ -164,8 +270,8 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		pev.solid = SOLID_SLIDEBOX;
 		pev.movetype = MOVETYPE_STEP;
 
-		//if( self.m_hEnemy.IsValid() and !pev.SpawnFlagBitSet(q2npc::SPAWNFLAG_MONSTER_AMBUSH) and !self.m_hEnemy.GetEntity().pev.FlagBitSet(FL_NOTARGET) )
-		if( pev.enemy !is null and !HasFlags(m_iSpawnFlags, q2npc::SPAWNFLAG_MONSTER_AMBUSH) and !pev.enemy.vars.FlagBitSet(FL_NOTARGET) )
+		//if( self.m_hEnemy.IsValid() and !pev.SpawnFlagBitSet(q2::SPAWNFLAG_MONSTER_AMBUSH) and !self.m_hEnemy.GetEntity().pev.FlagBitSet(FL_NOTARGET) )
+		if( pev.enemy !is null and !HasFlags(m_iSpawnFlags, q2::SPAWNFLAG_MONSTER_AMBUSH) and !pev.enemy.vars.FlagBitSet(FL_NOTARGET) )
 		{
 			self.m_hEnemy = EHandle( g_EntityFuncs.Instance(pev.enemy) );
 			self.ChangeSchedule( self.GetScheduleOfType(SCHED_CHASE_ENEMY) );
@@ -176,9 +282,9 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 
 	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
 	{
-		if( HasFlags(m_iSpawnFlags, q2npc::SPAWNFLAG_MONSTER_TRIGGER_SPAWN) )
+		if( HasFlags(m_iSpawnFlags, q2::SPAWNFLAG_MONSTER_TRIGGER_SPAWN) )
 		{
-			m_iSpawnFlags &= ~q2npc::SPAWNFLAG_MONSTER_TRIGGER_SPAWN;
+			m_iSpawnFlags &= ~q2::SPAWNFLAG_MONSTER_TRIGGER_SPAWN;
 
 			// we have a one frame delay here so we don't telefrag the guy who activated us
 			m_flTriggeredSpawn = pev.nextthink = g_Engine.time + q2::FRAMETIME;
@@ -215,6 +321,69 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		}
 	}
 
+	bool CheckMeleeAttack1( float flDot, float flDist )
+	{
+		if( m_bRerelease )
+		{
+			if( g_Engine.time < monsterinfo.melee_debounce_time )
+				return false;
+
+			if( flDist <= Q2_MELEE_DISTANCE_RR /*and flDot >= 0.7 and self.m_hEnemy.IsValid() and self.m_hEnemy.GetEntity().pev.FlagBitSet(FL_ONGROUND)*/ )
+				return true;
+		}
+		else
+		{
+			//don't always melee in easy mode (75% chance?)
+			if( q2npc::g_iDifficulty == q2::DIFF_EASY and (Math.RandomLong(0, 32767) & 3) != 0 ) //(rand()&3)
+				return false;
+
+			if( flDist <= Q2_MELEE_DISTANCE /*and flDot >= 0.7 and self.m_hEnemy.IsValid() and self.m_hEnemy.GetEntity().pev.FlagBitSet(FL_ONGROUND)*/ )
+				return true;
+		}
+
+		return false;
+	}
+
+	bool CheckMeleeAttack2( float flDot, float flDist )
+	{
+		if( m_bRerelease )
+		{
+			if( g_Engine.time < monsterinfo.melee_debounce_time )
+				return false;
+
+			if( flDist <= Q2_MELEE_DISTANCE_RR /*and flDot >= 0.7 and self.m_hEnemy.IsValid() and self.m_hEnemy.GetEntity().pev.FlagBitSet(FL_ONGROUND)*/ )
+				return true;
+		}
+		else
+		{
+			//don't always melee in easy mode (75% chance?)
+			if( q2npc::g_iDifficulty == q2::DIFF_EASY and (Math.RandomLong(0, 32767) & 3) != 0 ) //(rand()&3)
+				return false;
+
+			if( flDist <= Q2_MELEE_DISTANCE /*and flDot >= 0.7 and self.m_hEnemy.IsValid() and self.m_hEnemy.GetEntity().pev.FlagBitSet(FL_ONGROUND)*/ )
+				return true;
+		}
+
+		return false;
+	}
+
+	int DeadTakeDamage( entvars_t@ pevInflictor, entvars_t@ pevAttacker, float flDamage, int bitsDamageType )
+	{
+		int iMod = 0;
+		if( HasFlags(bitsDamageType, DMG_CRUSH) )
+			iMod = q2::MOD_CRUSH;
+
+		if( M_CheckGib(iMod) )
+		{
+			Killed( pevAttacker, GIB_ALWAYS );
+			return 0;
+		}
+
+		pev.health -= flDamage;
+
+		return 1;
+	}
+
 	void Killed( entvars_t@ pevAttacker, int iGib )
 	{
 		if( !m_sItemDrop.IsEmpty() )
@@ -236,20 +405,20 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		if( !string(pev.target).IsEmpty() or !string(self.m_iszKillTarget).IsEmpty() )
 			self.SUB_UseTargets( self.m_hEnemy.GetEntity(), USE_ON, 0.0 );
 
-		// [Paril-KEX] fire health target (when damaged and killed)
+		//fire health target (when damaged and killed)
 		if( !m_sHealthTarget.IsEmpty() )
 		{
 			pev.target = m_sHealthTarget;
 			self.SUB_UseTargets( self.m_hEnemy.GetEntity(), USE_ON, 0.0 );
 		}
 
-		MonsterKilled( pevAttacker, iGib );
-
-		if( !self.IsPlayerAlly() and !m_bHasBeenCounted )
+		if( !HasFlags(monsterinfo.aiflags, q2::AI_DO_NOT_COUNT) and !self.IsPlayerAlly() and !m_bHasBeenCounted )
 		{
 			q2::g_iKilledMonsters++;
 			m_bHasBeenCounted = true;
 		}
+
+		MonsterKilled( pevAttacker, iGib );
 
 		if( self.GetClassname() == "npc_q2jorg" or self.GetClassname() == "npc_q2makron" )
 			iGib = GIB_NEVER;
@@ -258,6 +427,107 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 	}
 
 	void MonsterKilled( entvars_t@ pevAttacker, int iGib ) {}
+
+	void GibMonster()
+	{
+		//medic commander only gets his slots back after the monster is gibbed, since we can revive them
+		if( HasFlags(monsterinfo.aiflags, q2::AI_SPAWNED_MEDIC_C) )
+		{
+			if( monsterinfo.commander.IsValid() and monsterinfo.commander.GetEntity().pev.ClassNameIs("npc_q2medic_commander") )
+			{
+				CBaseQ2NPC@ pMonster = q2npc::GetQ2Pointer( monsterinfo.commander.GetEntity() );
+				pMonster.monsterinfo.monster_used -= monsterinfo.monster_slots;
+			}
+
+			monsterinfo.commander = null;
+		}
+
+		MonsterGib();
+	}
+
+	void MonsterGib() {}
+
+	void RunTask( Task@ pTask )
+	{
+		switch( pTask.iTask )
+		{
+			case TASK_DIE:
+			{
+				//g_Game.AlertMessage( at_notice, "TASK_DIE!\n" );
+				if( self.m_fSequenceFinished and pev.frame >= 255 )
+				{
+					pev.deadflag = DEAD_DEAD;
+
+					SetThink( null );
+					self.StopAnimation();
+
+					MonsterDead();
+				}
+
+				break;
+			}
+
+			default:
+			{
+				MonsterRunTask( pTask );
+
+				break;
+			}
+		}
+	}
+
+	void MonsterRunTask( Task@ pTask ) { BaseClass.RunTask( pTask ); }
+	void MonsterDead() {}
+
+	void monster_dead_think_base()
+	{
+		// flies
+		if( HasFlags(monsterinfo.aiflags, q2::AI_STINKY) and !HasFlags(monsterinfo.aiflags, q2::AI_STUNK) ) //Value is too large for data type ??
+		{
+			if( m_flFlySoundDebounceTime == 0 )
+				m_flFlySoundDebounceTime = g_Engine.time + Math.RandomFloat( 1.0, 2.0 ); //5, 15
+			else if( m_flFlySoundDebounceTime < g_Engine.time )
+			{
+				if( !m_bSound )
+				{
+					m_iEffects |= q2::EF_FLIES;
+					g_SoundSystem.EmitSoundDyn( self.edict(), CHAN_BODY, "quake2/npcs/enforcer/inflies1.wav", VOL_NORM, ATTN_NORM, SND_FORCE_LOOP );
+					m_bSound = true;
+					m_flFlySoundDebounceTime = g_Engine.time + 60.0;
+				}
+				else
+				{
+					m_iEffects &= ~q2::EF_FLIES;
+					g_SoundSystem.StopSound( self.edict(), CHAN_BODY, "quake2/npcs/enforcer/inflies1.wav" );
+					m_bSound = false;
+					monsterinfo.aiflags |= q2::AI_STUNK;
+				}
+			}
+		}
+
+		/*if (!self->monsterinfo.damage_blood)
+		{
+			if (self->s.frame != self->monsterinfo.active_move->lastframe)
+				self->s.frame++;
+		}*/
+
+		pev.nextthink = g_Engine.time + 0.1;
+	}
+
+	void monster_dead_base()
+	{
+		//SetThink( ThinkFunction(this.monster_dead_think) );
+		//SetThink( ThinkFunction(cast<CBaseQ2NPC@>(@self).monster_dead_think) );
+		//SetThink( ThinkFunction(cast<CBaseQ2NPC@>(CastToScriptClass(self)).monster_dead_think) );
+		pev.nextthink = g_Engine.time + 0.1;
+		pev.movetype = MOVETYPE_TOSS;
+		//pev.solid = SOLID_NOT;
+		//self->svflags |= SVF_DEADMONSTER;
+		//self->monsterinfo.damage_blood = 0;
+		m_flFlySoundDebounceTime = 0;
+		monsterinfo.aiflags &= ~q2::AI_STUNK;
+		g_EntityFuncs.SetOrigin( self, pev.origin ); //gi.linkentity(self);
+	}
 
 	CBaseEntity@ DropItem( string sItemName )
 	{
@@ -318,9 +588,14 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		//g_EngineFuncs.ParticleEffect( pev.origin + pev.view_ofs, g_vecZero, 255, 10 );
 
 		DoMonsterIdle();
-		DoSearchSound();
+		DoMonsterSearch();
 		CheckArmorEffect();
+		M_SetEffects();
+
+		MonsterRunAI();
 	}
+
+	void MonsterRunAI() {}
 
 	bool ShouldFidget()
 	{
@@ -336,12 +611,12 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		}
 
 		return false;*/
-		return ( !HasFlags(m_iSpawnFlags, q2npc::SPAWNFLAG_MONSTER_AMBUSH) and !self.m_hEnemy.IsValid() and g_Engine.time > m_flIdleTime );
+		return ( !HasFlags(m_iSpawnFlags, q2::SPAWNFLAG_MONSTER_AMBUSH) and !self.m_hEnemy.IsValid() and g_Engine.time > m_flIdleTime );
 	}
 
 	void DoMonsterIdle()
 	{
-		if( !HasFlags(m_iSpawnFlags, q2npc::SPAWNFLAG_MONSTER_AMBUSH) and self.m_Activity == ACT_IDLE and g_Engine.time > m_flIdleTime )
+		if( !HasFlags(m_iSpawnFlags, q2::SPAWNFLAG_MONSTER_AMBUSH) and self.m_Activity == ACT_IDLE and g_Engine.time > m_flIdleTime )
 		{
 			if( m_flIdleTime > 0.0 )
 			{
@@ -355,13 +630,13 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 
 	void MonsterIdle() {}
 
-	void DoSearchSound()
+	void DoMonsterSearch()
 	{
 		if( self.m_Activity == ACT_WALK and g_Engine.time > m_flIdleTime )
 		{
 			if( m_flIdleTime > 0.0 )
 			{
-				SearchSound();
+				MonsterSearch();
 				m_flIdleTime = g_Engine.time + 15 + Math.RandomFloat(0, 1) * 15;
 			}
 			else
@@ -369,23 +644,23 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		}
 	}
 
-	void SearchSound() {}
+	void MonsterSearch() {}
 
 	void AlertSound()
 	{
-		if( HasFlags(m_iSpawnFlags, q2npc::SPAWNFLAG_MONSTER_AMBUSH) )
-			m_iSpawnFlags &= ~q2npc::SPAWNFLAG_MONSTER_AMBUSH;
+		if( HasFlags(m_iSpawnFlags, q2::SPAWNFLAG_MONSTER_AMBUSH) )
+			m_iSpawnFlags &= ~q2::SPAWNFLAG_MONSTER_AMBUSH;
 
-		MonsterAlertSound();
+		MonsterSight();
 	}
 
-	void MonsterAlertSound() {}
+	void MonsterSight() {}
 
 	void HandleAnimEvent( MonsterEvent@ pEvent )
 	{
 		switch( pEvent.event )
 		{
-			case q2npc::AE_WALKMOVE:
+			case q2::AE_WALKMOVE:
 			{
 				//it's too buggy for movement :[
 				WalkMove( atoi(pEvent.options()) );
@@ -393,9 +668,9 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 				break;
 			}
 
-			case q2npc::AE_FOOTSTEP:
+			case q2::AE_FOOTSTEP:
 			{
-				if( m_bRerelease and !HasFlags(m_iSpawnFlags, q2npc::SPAWNFLAG_MONSTER_AMBUSH) )
+				if( m_bRerelease and !HasFlags(m_iSpawnFlags, q2::SPAWNFLAG_MONSTER_AMBUSH) )
 				{
 					if( atoi(pEvent.options()) > 0 )
 						monster_footstep( atoi(pEvent.options()) );
@@ -407,7 +682,7 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 			}
 
 			//HACK
-			case q2npc::AE_FLINCHRESET:
+			case q2::AE_FLINCHRESET:
 			{
 				self.SetActivity( ACT_RESET );
 				break;
@@ -420,10 +695,10 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 			}
 		}
 
-		HandleAnimEventQ2( pEvent );
+		MonsterHandleAnimEvent( pEvent );
 	}
 
-	void HandleAnimEventQ2( MonsterEvent@ pEvent ) {}
+	void MonsterHandleAnimEvent( MonsterEvent@ pEvent ) {}
 
 	bool M_CheckAttack( float flDist )
 	{
@@ -457,9 +732,9 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		else
 			flChance = flFarChance;
 
-		if( q2npc::g_iDifficulty == q2npc::DIFF_EASY )
+		if( q2npc::g_iDifficulty == q2::DIFF_EASY )
 			flChance *= 0.5;
-		else if( q2npc::g_iDifficulty >= q2npc::DIFF_HARD )
+		else if( q2npc::g_iDifficulty >= q2::DIFF_HARD )
 			flChance *= 2.0;
 
 		if( Math.RandomFloat(0.0, 1.0) < flChance )
@@ -472,9 +747,13 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		return true;
 	}
 
+	//TODO fix this ??
+	void SetSkin() { MonsterSetSkin(); }
+	void MonsterSetSkin() {}
+
 	bool M_ShouldReactToPain()
 	{
-		if( q2npc::g_iDifficulty >= q2npc::DIFF_NIGHTMARE )
+		if( q2npc::g_iDifficulty >= q2::DIFF_NIGHTMARE )
 			return false;
 
 		return true;
@@ -685,13 +964,13 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		//if( (dflags & DAMAGE_NO_ARMOR) != 0 ) // armour does not protect from this damage eg: drowning
 			//return 0;
 
-		if( m_iPowerArmorType == q2npc::POWER_ARMOR_NONE )
+		if( monsterinfo.power_armor_type == q2::POWER_ARMOR_NONE )
 			return 0;
 
-		if( m_iPowerArmorPower <= 0 )
+		if( monsterinfo.power_armor_power <= 0 )
 			return 0;
 
-		if( m_iPowerArmorType == q2npc::POWER_ARMOR_SCREEN )
+		if( monsterinfo.power_armor_type == q2::POWER_ARMOR_SCREEN )
 		{
 			//only works if damage point is in front
 			Math.MakeVectors( pev.angles );
@@ -710,7 +989,7 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 			flDamage = (2 * flDamage) / 3;
 		}
 
-		flSave = m_iPowerArmorPower * iDamagePerCell;
+		flSave = monsterinfo.power_armor_power * iDamagePerCell;
 
 		if( flSave <= 0 )
 			return 0;
@@ -732,18 +1011,18 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		Vector vecDir = (pevInflictor.origin - pev.origin).Normalize();
 		float flYaw = Math.VecToAngles(vecDir).y;
 
-		g_SoundSystem.EmitSound( self.edict(), CHAN_AUTO, "quake2/weapons/laser_hit.wav", VOL_NORM, ATTN_NORM );
+		g_SoundSystem.EmitSound( self.edict(), CHAN_AUTO, "quake2/weapons/lashit.wav", VOL_NORM, ATTN_NORM );
 
-		if( m_iPowerArmorType == q2npc::POWER_ARMOR_SCREEN )
+		if( monsterinfo.power_armor_type == q2::POWER_ARMOR_SCREEN )
 			PowerArmorEffect( flYaw );
-		else if( m_iPowerArmorType == q2npc::POWER_ARMOR_SHIELD )
+		else if( monsterinfo.power_armor_type == q2::POWER_ARMOR_SHIELD )
 			PowerArmorEffect( flYaw, false );
 
 		iPowerUsed = int(flSave) / iDamagePerCell;
 
-		m_iPowerArmorPower -= iPowerUsed;
+		monsterinfo.power_armor_power -= iPowerUsed;
 
-		if( m_iPowerArmorPower <= 0 )
+		if( monsterinfo.power_armor_power <= 0 )
 			g_SoundSystem.EmitSound( self.edict(), CHAN_ITEM, "quake2/misc/mon_power2.wav", VOL_NORM, ATTN_NORM );
 
 		return flSave;
@@ -789,10 +1068,165 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		}
 	}
 
-	//for chaos mode
-	void monster_fire_weapon( int iWeaponType, Vector vecMuzzle, Vector vecAim, float flDamage, float flSpeed = 600.0, float flRightAdjust = 0.0, float flUpAdjust = 0.0 )
+	bool fire_hit( Vector vecAim, float flDamage, int iKick )
 	{
-		if( q2npc::g_iChaosMode == q2npc::CHAOS_LEVEL1 )
+		if( m_bRerelease )
+			return fire_hit_rr( vecAim, flDamage, iKick );
+
+		return fire_hit_original( vecAim, flDamage, iKick );
+	}
+
+	bool fire_hit_original( Vector vecAim, float flDamage, int iKick )
+	{
+		if( !self.m_hEnemy.IsValid() )
+			return false;
+
+		TraceResult	tr;
+		Vector			vecForward, vecRight, vecUp;
+		Vector			v;
+		Vector			vecPoint;
+		float				flRange;
+		Vector			vecDir;
+
+		//see if enemy is in range
+		vecDir = self.m_hEnemy.GetEntity().pev.origin - pev.origin;
+		flRange = vecDir.Length();
+		if( flRange > vecAim.x )
+			return false;
+
+		if( vecAim.y > pev.mins.x and vecAim.y < pev.maxs.x )
+		{
+			// the hit is straight on so back the range up to the edge of their bbox
+			flRange -= self.m_hEnemy.GetEntity().pev.maxs.x;
+		}
+		else
+		{
+			// this is a side hit so adjust the "right" value out to the edge of their bbox
+			if( vecAim.y < 0 )
+				vecAim.y = self.m_hEnemy.GetEntity().pev.mins.x;
+			else
+				vecAim.y = self.m_hEnemy.GetEntity().pev.maxs.x;
+		}
+
+		vecPoint = pev.origin + vecDir * flRange;
+
+		g_Utility.TraceLine( pev.origin, vecPoint, dont_ignore_monsters, self.edict(), tr ); //tr = gi.trace (self->s.origin, NULL, NULL, vecPoint, self, MASK_SHOT);
+		if( tr.flFraction < 1.0 )
+		{
+			if( tr.pHit.vars.takedamage == DAMAGE_NO )
+				return false;
+
+			// if it will hit any client/monster then hit the one we wanted to hit
+			if( tr.pHit.vars.FlagBitSet(FL_MONSTER|FL_CLIENT) ) //(tr.ent->svflags & SVF_MONSTER) or tr.ent->client
+				@tr.pHit = self.m_hEnemy.GetEntity().edict();
+		}
+
+		g_EngineFuncs.AngleVectors( pev.angles, vecForward, vecRight, vecUp );
+
+		vecPoint = pev.origin + vecForward * flRange + vecRight * vecAim.y + vecUp * vecAim.z;
+		vecDir = vecPoint - self.m_hEnemy.GetEntity().pev.origin;
+
+		// do the damage
+		//T_Damage (tr.ent, self, self, vecDir, vecPoint, vec3_origin, flDamage, iKick/2, DAMAGE_NO_KNOCKBACK, MOD_HIT);
+		q2::T_Damage( g_EntityFuncs.Instance(tr.pHit), self, self, vecDir, vecPoint, g_vecZero, flDamage, iKick/2, 0, q2::MOD_HIT );
+		//g_EntityFuncs.Instance(tr.pHit).TakeDamage( self.pev, self.pev, flDamage, DMG_GENERIC );
+
+		//if( !(tr.ent->svflags & SVF_MONSTER) and (!tr.ent->client) )
+		if( !tr.pHit.vars.FlagBitSet(FL_MONSTER|FL_CLIENT) )
+			return false;
+
+		// do our special form of knockback here
+		v = self.m_hEnemy.GetEntity().pev.absmin + self.m_hEnemy.GetEntity().pev.size * 0.5;
+		v = (v - vecPoint).Normalize(); //VectorNormalize (v);
+		self.m_hEnemy.GetEntity().pev.velocity = self.m_hEnemy.GetEntity().pev.velocity + v * iKick;
+
+		//if( self.m_hEnemy.GetEntity().pev.velocity.z > 0 )
+			//@self.m_hEnemy.GetEntity().pev.groundentity = null;
+
+		return true;
+	}
+
+	bool fire_hit_rr( Vector vecAim, float flDamage, int iKick )
+	{
+		if( !self.m_hEnemy.IsValid() )
+			return false;
+
+		TraceResult	tr;
+		Vector			forward, right, up;
+		Vector			v;
+		Vector			point;
+		float				range;
+		Vector			dir;
+
+		// see if enemy is in range
+		range = q2::distance_between_boxes( self.m_hEnemy.GetEntity().pev.absmin, self.m_hEnemy.GetEntity().pev.absmax, pev.absmin, pev.absmax );
+		if( range > vecAim.x )
+			return false;
+
+		if( !(vecAim.y > pev.mins.x and vecAim.y < pev.maxs.x) )
+		{
+			// this is a side hit so adjust the "right" value out to the edge of their bbox
+			if( vecAim.y < 0 )
+				vecAim.y = self.m_hEnemy.GetEntity().pev.mins.x;
+			else
+				vecAim.y = self.m_hEnemy.GetEntity().pev.maxs.x;
+		}
+
+		point = q2::closest_point_to_box( pev.origin, self.m_hEnemy.GetEntity().pev.absmin, self.m_hEnemy.GetEntity().pev.absmax );
+
+		// check that we can hit the point on the bbox
+		g_Utility.TraceLine( pev.origin, point, dont_ignore_monsters, self.edict(), tr ); //tr = gi.traceline(self->s.origin, point, self, MASK_PROJECTILE);
+
+		if( tr.flFraction < 1 )
+		{
+			if( tr.pHit.vars.takedamage == DAMAGE_NO )
+				return false;
+
+			// if it will hit any client/monster then hit the one we wanted to hit
+			if( tr.pHit.vars.FlagBitSet(FL_MONSTER|FL_CLIENT) ) //if ((tr.ent->svflags & SVF_MONSTER) || (tr.ent->client))
+				@tr.pHit = self.m_hEnemy.GetEntity().edict(); //tr.ent = self->enemy;
+		}
+
+		// check that we can hit the player from the point
+		g_Utility.TraceLine( point, self.m_hEnemy.GetEntity().pev.origin, dont_ignore_monsters, self.edict(), tr );  //tr = gi.traceline(point, self.m_hEnemy.GetEntity().pev.origin, self, MASK_PROJECTILE);
+
+		if( tr.flFraction < 1 )
+		{
+			if( tr.pHit.vars.takedamage == DAMAGE_NO )
+				return false;
+
+			// if it will hit any client/monster then hit the one we wanted to hit
+			if( tr.pHit.vars.FlagBitSet(FL_MONSTER|FL_CLIENT) ) //if ((tr.ent->svflags & SVF_MONSTER) || (tr.ent->client))
+				@tr.pHit = self.m_hEnemy.GetEntity().edict(); //tr.ent = self->enemy;
+		}
+
+		g_EngineFuncs.AngleVectors( pev.angles, forward, right, up );
+		point = pev.origin + ( forward * range );
+		point = point + ( right * vecAim.y );
+		point = point + ( up * vecAim.z );
+		dir = point - self.m_hEnemy.GetEntity().pev.origin;
+
+		// do the damage
+		q2::T_Damage( g_EntityFuncs.Instance(tr.pHit), self, self, dir, point, g_vecZero, flDamage, iKick / 2, 0, q2::MOD_HIT ); //DAMAGE_NO_KNOCKBACK, MOD_HIT
+
+		if( !tr.pHit.vars.FlagBitSet(FL_MONSTER|FL_CLIENT) ) //if (!(tr.ent->svflags & SVF_MONSTER) && (!tr.ent->client))
+			return false;
+
+		// do our special form of knockback here (TOO MUCH??)
+		/*v = ( self.m_hEnemy.GetEntity().pev.absmin + self.m_hEnemy.GetEntity().pev.absmax ) * 0.5;
+		v = (v - point).Normalize();
+		self.m_hEnemy.GetEntity().pev.velocity = self.m_hEnemy.GetEntity().pev.velocity + v * iKick;*/
+
+		//if( self.m_hEnemy.GetEntity().pev.velocity.z > 0 )
+			//@self.m_hEnemy.GetEntity().pev.groundentity = null;
+
+		return true;
+	}
+
+	//for chaos mode
+	void monster_fire_weapon( int iWeaponType, Vector vecMuzzle, Vector vecAim, float flDamage, float flSpeed = 600.0, float flRightAdjust = 0.0, float flUpAdjust = 0.0, int iFlags = 0 )
+	{
+		if( q2npc::g_iChaosMode == q2::CHAOS_LEVEL1 )
 			iWeaponType = m_iWeaponType;
 		else if( (m_iWeaponType & 2048) != 0 )
 		{
@@ -800,64 +1234,68 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 			m_iWeaponType &= ~2048;
 			iWeaponType = m_iWeaponType;
 		}
-		else if( q2npc::g_iChaosMode == q2npc::CHAOS_LEVEL2 )
+		else if( q2npc::g_iChaosMode == q2::CHAOS_LEVEL2 )
 		{
-			if( q2npc::g_iDifficulty < q2npc::DIFF_NIGHTMARE )
-				iWeaponType = Math.RandomLong( q2npc::WEAPON_BULLET, q2npc::WEAPON_RAILGUN );
+			if( q2npc::g_iDifficulty < q2::DIFF_NIGHTMARE )
+				iWeaponType = Math.RandomLong( q2::WEAPON_BULLET, q2::WEAPON_RAILGUN );
 			else
-				iWeaponType = Math.RandomLong( q2npc::WEAPON_BULLET, q2npc::WEAPON_BFG );
+				iWeaponType = Math.RandomLong( q2::WEAPON_BULLET, q2::WEAPON_BFG );
 		}
 
 		switch( iWeaponType )
 		{
-			case q2npc::WEAPON_BULLET:
+			case q2::WEAPON_BULLET:
 			{
 				monster_fire_bullet( vecMuzzle, vecAim, flDamage );
 				break;
 			}
 
-			case q2npc::WEAPON_SHOTGUN:
+			case q2::WEAPON_SHOTGUN:
 			{
 				pev.weapons = q2::MOD_SHOTGUN;
 				monster_fire_shotgun( vecMuzzle, vecAim, flDamage );
 				break;
 			}
 
-			case q2npc::WEAPON_BLASTER:
+			case q2::WEAPON_BLASTER:
 			{
-				if( self.GetClassname() == "npc_q2soldier_light" )
-					monster_fire_blaster( vecMuzzle, vecAim, flDamage, flSpeed );
-				else
-					monster_fire_blaster( vecMuzzle, vecAim, flDamage, flSpeed, true );
+				monster_fire_blaster( vecMuzzle, vecAim, flDamage, flSpeed, iFlags );
 
 				break;
 			}
 
-			case q2npc::WEAPON_GRENADE:
+			case q2::WEAPON_BLASTER2:
+			{
+				monster_fire_blaster2( vecMuzzle, vecAim, flDamage, flSpeed, iFlags );
+
+				break;
+			}
+
+			case q2::WEAPON_GRENADE:
 			{
 				monster_fire_grenade( vecMuzzle, vecAim, flDamage, flSpeed, flRightAdjust, flUpAdjust );
 				break;
 			}
 
-			case q2npc::WEAPON_ROCKET:
+			case q2::WEAPON_ROCKET:
 			{
 				monster_fire_rocket( vecMuzzle, vecAim, flDamage, flSpeed );
 				break;
 			}
 
-			case q2npc::WEAPON_HEATSEEKING:
+			case q2::WEAPON_HEATSEEKING:
 			{
 				monster_fire_rocket( vecMuzzle, vecAim, flDamage, flSpeed, true );
 				break;
 			}
 
-			case q2npc::WEAPON_RAILGUN:
+			case q2::WEAPON_RAILGUN:
 			{
-				monster_fire_railgun( vecMuzzle, vecAim, flDamage );
+				monster_fire_railgun( vecMuzzle, vecAim, flDamage, flSpeed );
 				break;
 			}
 
-			case q2npc::WEAPON_BFG:
+			case q2::WEAPON_BFG:
 			{
 				if( pev.classname == "npc_q2jorg" )
 					monster_fire_bfg( vecMuzzle, vecAim, flDamage, flSpeed, 200 );
@@ -890,9 +1328,10 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		//self.FireBullets( iCount, vecStart, vecDir, q2npc::DEFAULT_SHOTGUN_SPREAD, 2048, BULLET_PLAYER_CUSTOMDAMAGE, 1, int(flDamage), self.pev );
 	}
 
-	void monster_fire_blaster( Vector vecStart, Vector vecDir, float flDamage, float flSpeed, bool bHyper = false )
+	void monster_fire_blaster( Vector vecStart, Vector vecDir, float flDamage, float flSpeed, int iFlags = 0 )
 	{
-		CBaseEntity@ pLaser = g_EntityFuncs.Create( "q2laser", vecStart, vecDir, false, self.edict() ); 
+		CBaseEntity@ pLaser = g_EntityFuncs.Create( "q2laser", vecStart, vecDir, true, self.edict() ); 
+		pLaser.pev.speed = flSpeed;
 		pLaser.pev.velocity = vecDir * flSpeed;
 		pLaser.pev.dmg = flDamage;
 		pLaser.pev.angles = Math.VecToAngles( vecDir.Normalize() );
@@ -901,13 +1340,84 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		q2npc::g_dicMonsterNames.get( self.GetClassname(), sMonsterName ); //for death messages
 		pLaser.pev.netname = sMonsterName;
 
-		if( bHyper )
+		if( HasFlags(iFlags, q2::EF_HYPERBLASTER) )
 			pLaser.pev.weapons = q2::MOD_HYPERBLASTER;
-		else
+		else if( HasFlags(iFlags, q2::EF_BLASTER) )
 			pLaser.pev.weapons = q2::MOD_BLASTER;
+		else
+		{
+			pLaser.pev.weapons = q2::MOD_HYPERBLASTER;
+			pLaser.pev.frags = 1.0; //EF_NONE
+		}
 
-		if( q2npc::g_iChaosMode > q2npc::CHAOS_NONE and self.GetClassname() == "npc_q2supertank" and pev.sequence == self.LookupSequence("attack_grenade") )
+		if( q2npc::g_iChaosMode > q2::CHAOS_NONE and self.GetClassname() == "npc_q2supertank" and pev.sequence == self.LookupSequence("attack_grenade") )
 			pLaser.pev.movetype = MOVETYPE_TOSS;
+
+		g_EntityFuncs.DispatchSpawn( pLaser.edict() );
+
+		//needed ??
+		TraceResult tr;
+		g_Utility.TraceLine( pev.origin, pLaser.pev.origin, ignore_monsters, dont_ignore_glass, pLaser.edict(), tr);
+
+		if( tr.flFraction < 1.0 )
+		{
+			// Adjust bolt origin to impact point, offset from surface
+			Vector vecImpactPoint = tr.vecEndPos + tr.vecPlaneNormal;
+			pLaser.pev.origin = vecImpactPoint;
+
+			g_EntityFuncs.SetOrigin( pLaser, vecImpactPoint );
+			pLaser.Touch( g_EntityFuncs.Instance(tr.pHit) );
+		}
+	}
+
+	void monster_fire_blaster2( Vector vecStart, Vector vecDir, float flDamage, float flSpeed, int iFlags = 0 )
+	{
+		CBaseEntity@ pLaser = g_EntityFuncs.Create( "q2laser", vecStart, vecDir, true, self.edict() ); 
+		pLaser.pev.speed = flSpeed;
+		pLaser.pev.velocity = vecDir * flSpeed;
+		pLaser.pev.dmg = flDamage;
+		pLaser.pev.angles = Math.VecToAngles( vecDir.Normalize() );
+
+		//if( effect )
+			//bolt->s.effects |= EF_TRACKER;
+
+		//bolt->dmg_radius = 128;
+		pLaser.pev.skin = 2;
+		pLaser.pev.scale = 2.5;
+		//bolt->touch = blaster2_touch;
+
+		string sMonsterName;
+		q2npc::g_dicMonsterNames.get( self.GetClassname(), sMonsterName ); //for death messages
+		pLaser.pev.netname = sMonsterName;
+
+		if( HasFlags(iFlags, q2::EF_HYPERBLASTER) )
+			pLaser.pev.weapons = q2::MOD_HYPERBLASTER;
+		else if( HasFlags(iFlags, q2::EF_BLASTER) )
+			pLaser.pev.weapons = q2::MOD_BLASTER;
+		else
+		{
+			pLaser.pev.weapons = q2::MOD_HYPERBLASTER;
+			pLaser.pev.frags = 1.0; //EF_NONE
+		}
+
+		if( q2npc::g_iChaosMode > q2::CHAOS_NONE and self.GetClassname() == "npc_q2supertank" and pev.sequence == self.LookupSequence("attack_grenade") )
+			pLaser.pev.movetype = MOVETYPE_TOSS;
+
+		g_EntityFuncs.DispatchSpawn( pLaser.edict() );
+
+		//needed ??
+		TraceResult tr;
+		g_Utility.TraceLine( pev.origin, pLaser.pev.origin, ignore_monsters, dont_ignore_glass, pLaser.edict(), tr);
+
+		if( tr.flFraction < 1.0 )
+		{
+			// Adjust bolt origin to impact point, offset from surface
+			Vector vecImpactPoint = tr.vecEndPos + tr.vecPlaneNormal;
+			pLaser.pev.origin = vecImpactPoint;
+
+			g_EntityFuncs.SetOrigin( pLaser, vecImpactPoint );
+			pLaser.Touch( g_EntityFuncs.Instance(tr.pHit) );
+		}
 	}
 
 	void monster_fire_grenade( Vector vecStart, Vector vecAim, float flDamage, float flSpeed, float flRightAdjust = 0.0, float flUpAdjust = 0.0 )
@@ -942,9 +1452,15 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 
 	void monster_fire_rocket( Vector vecStart, Vector vecDir, float flDamage, float flSpeed, bool bHeatSeeking = false )
 	{
-		CBaseEntity@ pRocket = g_EntityFuncs.Create( "q2rocket", vecStart, vecDir, true, self.edict() ); 
+		CBaseEntity@ cbeRocket = g_EntityFuncs.Create( "q2rocket", vecStart, vecDir, true, self.edict() ); 
+		q2projectiles::q2rocket@ pRocket = cast<q2projectiles::q2rocket@>(CastToScriptClass(cbeRocket));
+
+		pRocket.pev.speed = flSpeed;
 		pRocket.pev.velocity = vecDir * flSpeed;
 		pRocket.pev.dmg = flDamage;
+		pRocket.m_flDamageRadius = flDamage + 20;
+		pRocket.m_flRadiusDamage = flDamage;
+		
 		pRocket.pev.angles = Math.VecToAngles( vecDir.Normalize() );
 
 		if( self.GetClassname() == "npc_q2supertank" )
@@ -957,19 +1473,19 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		if( bHeatSeeking )
 		{
 			pRocket.pev.weapons = 1;
-			pRocket.pev.speed = flSpeed;
 			pRocket.pev.frags = m_flHeatTurnRate;
 		}
 
-		g_EntityFuncs.DispatchSpawn( pRocket.edict() );
+		g_EntityFuncs.DispatchSpawn( pRocket.self.edict() );
 
-		if( q2npc::g_iChaosMode > q2npc::CHAOS_NONE and self.GetClassname() == "npc_q2supertank" and pev.sequence == self.LookupSequence("attack_grenade") )
+		if( q2npc::g_iChaosMode > q2::CHAOS_NONE and self.GetClassname() == "npc_q2supertank" and pev.sequence == self.LookupSequence("attack_grenade") )
 			pRocket.pev.movetype = MOVETYPE_TOSS;
 	}
 
 	void monster_fire_bfg( Vector vecStart, Vector vecDir, float flDamage, float flSpeed, float flDamageRadius )
 	{
-		CBaseEntity@ pBFG = g_EntityFuncs.Create( "q2bfg", vecStart, vecDir, false, self.edict() );
+		CBaseEntity@ pBFG = g_EntityFuncs.Create( "q2bfg", vecStart, vecDir, true, self.edict() );
+		pBFG.pev.speed = flSpeed;
 		pBFG.pev.velocity = vecDir * flSpeed;
 		pBFG.pev.dmg = flDamage;
 		pBFG.pev.dmgtime = flDamageRadius;
@@ -978,15 +1494,17 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		q2npc::g_dicMonsterNames.get( self.GetClassname(), sMonsterName ); //for death messages
 		pBFG.pev.netname = sMonsterName;
 
-		if( q2npc::g_iChaosMode > q2npc::CHAOS_NONE and self.GetClassname() == "npc_q2supertank" and pev.sequence == self.LookupSequence("attack_grenade") )
+		if( q2npc::g_iChaosMode > q2::CHAOS_NONE and self.GetClassname() == "npc_q2supertank" and pev.sequence == self.LookupSequence("attack_grenade") )
 			pBFG.pev.movetype = MOVETYPE_TOSS;
+
+		g_EntityFuncs.DispatchSpawn( pBFG.edict() );
 	}
 
-	void monster_fire_railgun( Vector vecStart, Vector vecEnd, float flDamage )
+	void monster_fire_railgun( Vector vecStart, Vector vecAim, float flDamage, float flKick = 0 )
 	{
 		TraceResult tr;
 
-		vecEnd = vecStart + vecEnd * 8192;
+		Vector vecEnd = vecStart + vecAim * 8192;
 		Vector railstart = vecStart;
 		
 		edict_t@ ignore = self.edict();
@@ -1005,7 +1523,8 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 			g_WeaponFuncs.ClearMultiDamage();
 
 			if( tr.pHit !is self.edict() and pHit.pev.takedamage != DAMAGE_NO )
-				pHit.TraceAttack( self.pev, flDamage, vecEnd, tr, DMG_ENERGYBEAM | DMG_LAUNCH ); 
+				q2::T_Damage( g_EntityFuncs.Instance(tr.pHit), self, self, vecAim, tr.vecEndPos, tr.vecPlaneNormal, flDamage, flKick, 0, q2::MOD_RAILGUN );
+				//pHit.TraceAttack( self.pev, flDamage, vecEnd, tr, DMG_ENERGYBEAM | DMG_LAUNCH );
 
 			g_WeaponFuncs.ApplyMultiDamage( self.pev, self.pev );
 
@@ -1091,15 +1610,6 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 			m2.WriteByte( 8 ); //lifetime
 			m2.WriteByte( 50 ); //decay
 		m2.End();*/
-	}
-
-	Vector closest_point_to_box( const Vector &in from, const Vector &in absmins, const Vector &in absmaxs )
-	{
-		return Vector(
-			(from.x < absmins.x) ? absmins.x : (from.x > absmaxs.x) ? absmaxs.x : from.x,
-			(from.y < absmins.y) ? absmins.y : (from.y > absmaxs.y) ? absmaxs.y : from.y,
-			(from.z < absmins.z) ? absmins.z : (from.z > absmaxs.z) ? absmaxs.z : from.z
-		);
 	}
 
 	//from pm_shared.c, because model event 2003 doesn't work :aRage:
@@ -1458,28 +1968,542 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		return vecGrenadeVel;
 	}
 
-	void WalkMove( float flDist )
+	void M_SetEffects()
 	{
-		g_EngineFuncs.WalkMove( self.edict(), self.pev.angles.y, flDist, WALKMOVE_NORMAL );
+		//ent->s.effects &= ~(EF_COLOR_SHELL|EF_POWERSCREEN);
+		//ent->s.renderfx &= ~(RF_SHELL_RED|RF_SHELL_GREEN|RF_SHELL_BLUE);
+		pev.renderfx = kRenderFxNone;
+		pev.renderamt = 255;
+		pev.rendercolor = Vector( 0, 0, 0 );
+
+		if( HasFlags(monsterinfo.aiflags, q2::AI_RESURRECTING) )
+		{
+			//g_Game.AlertMessage( at_notice, "M_SetEffects() %1 is being resurrected!\n", self.GetClassname() );
+			pev.renderfx = kRenderFxGlowShell;
+			pev.renderamt = 69;
+			pev.rendercolor = Vector( 255, 0, 0 );
+		}
+		/*else if( pev.renderfx == kRenderFxGlowShell and m_flArmorEffectOff == 0.0 )
+		{
+			g_Game.AlertMessage( at_notice, "M_SetEffects() %1 is no longer being resurrected!\n", self.GetClassname() );
+			pev.renderfx = kRenderFxNone;
+			pev.renderamt = 255;
+			pev.rendercolor = Vector( 0, 0, 0 );
+		}*/
+/*
+		if (ent->health <= 0)
+			return;
+
+		if (ent->powerarmor_time > level.time)
+		{
+			if (ent->monsterinfo.power_armor_type == POWER_ARMOR_SCREEN)
+			{
+				ent->s.effects |= EF_POWERSCREEN;
+			}
+			else if (ent->monsterinfo.power_armor_type == POWER_ARMOR_SHIELD)
+			{
+				ent->s.effects |= EF_COLOR_SHELL;
+				ent->s.renderfx |= RF_SHELL_GREEN;
+			}
+		}*/
 	}
 
-	bool visible( CBaseEntity@ pTarget )
+	void M_SetupReinforcements( string sReinforcements, reinforcement_list_t &out list ) //out ??
+	{
+		// count up the semicolons
+		list.num_reinforcements = 0;
+
+		if( sReinforcements.IsEmpty() )
+			return;
+
+		array<string> parsed = sReinforcements.Split( ";" );
+
+		list.num_reinforcements = parsed.length();
+		//g_Game.AlertMessage( at_notice, "M_SetupReinforcements length: %1\n", parsed.length() );
+
+		for( uint i = 0; i < parsed.length(); i++ )
+		{
+			array<string> parsed2 = parsed[i].Split( " " );
+
+			reinforcement_t reinforcement;
+			reinforcement.classname = parsed2[ 0 ];
+			reinforcement.strength = atoi( parsed2[1] );
+
+			CBaseEntity@ pNewEnt = g_EntityFuncs.Create( reinforcement.classname, g_vecZero, g_vecZero, true );
+			CBaseQ2NPC@ pMonster = q2npc::GetQ2Pointer( pNewEnt );
+
+			pMonster.monsterinfo.aiflags |= q2::AI_DO_NOT_COUNT;
+			pMonster.pev.spawnflags = 16; //prisoner
+
+			g_EntityFuncs.DispatchSpawn( pMonster.self.edict() );
+
+			reinforcement.mins = pMonster.pev.mins;
+			reinforcement.maxs = pMonster.pev.maxs;
+
+			g_EntityFuncs.Remove( pMonster.self );
+
+			list.reinforcements.insertLast( reinforcement );
+			//g_Game.AlertMessage( at_notice, "M_SetupReinforcements %1: %2\n", i, parsed[i] );
+			//g_Game.AlertMessage( at_notice, "classname: %1, strength: %2\n", parsed2[0], parsed2[1] );
+		}
+
+		/*if( list.num_reinforcements > 0 )
+		{
+			g_Game.AlertMessage( at_notice, "list.num_reinforcements: %1\n", list.num_reinforcements );
+
+			for( int j = 0; j < list.num_reinforcements; j++ )
+			{
+				g_Game.AlertMessage( at_notice, "ENTRY #%1\n", j );
+				g_Game.AlertMessage( at_notice, "classname: %1\n", list.reinforcements[j].classname );
+				g_Game.AlertMessage( at_notice, "strength: %1\n", list.reinforcements[j].strength );
+				g_Game.AlertMessage( at_notice, "mins: %1\n", list.reinforcements[j].mins.ToString() );
+				g_Game.AlertMessage( at_notice, "maxs: %1\n\n", list.reinforcements[j].maxs.ToString() );
+			}
+		}*/
+	}
+
+	// filter out the reinforcement indices we can pick given the space we have left
+	void M_PickValidReinforcements( int space, array<uint8> &out output ) //std::vector<uint8_t> &output
+	{
+		output.resize( 0 ); //output.clear();
+
+		for( int i = 0; i < monsterinfo.reinforcements.num_reinforcements; i++ )
+		{
+			if( monsterinfo.reinforcements.reinforcements[i].strength <= space )
+				output.insertLast( i );
+		}
+	}
+
+	// pick an array of reinforcements to use; note that this does not modify `self`
+	//std::array<uint8_t, MAX_REINFORCEMENTS>
+	array<uint8> M_PickReinforcements( int &out num_chosen, int max_slots = 0 )
+	{
+		array<uint8> available; //static std::vector<uint8_t> available;
+		array<uint8> chosen( MAX_REINFORCEMENTS, uint8(255) ); //std::array<uint8_t, MAX_REINFORCEMENTS> //chosen.fill(255);
+
+		// decide how many things we want to spawn;
+		// this is on a logarithmic scale
+		// so we don't spawn too much too often.
+		int num_slots = Math.max( 1, int(log(Math.RandomFloat(0.0, 1.0) * inverse_log_slots) / log(2.0)) ); //int32_t num_slots = max(1, (int32_t) log2(frandom(inverse_log_slots)));
+
+		// we only have this many slots left to use
+		int remaining = monsterinfo.monster_slots - monsterinfo.monster_used;
+
+		for( num_chosen = 0; num_chosen < num_slots; num_chosen++ )
+		{
+			// ran out of slots!
+			if( (max_slots != 0 and num_chosen == max_slots) or remaining <= 0 )
+				break;
+
+			// get everything we could choose
+			M_PickValidReinforcements( remaining, available );
+
+			// can't pick any
+			if( available.length() <= 0 )
+				break;
+
+			// select monster, TODO fairly
+			chosen[num_chosen] = uint8( Math.RandomLong(0, available.length()-1) ); //random_element( available );
+
+			remaining -= monsterinfo.reinforcements.reinforcements[chosen[num_chosen]].strength;
+		}
+
+		return chosen;
+	}
+
+	int M_SlotsLeft()
+	{
+		return monsterinfo.monster_slots - monsterinfo.monster_used; 
+	} 
+
+	//from quake 2 rerelease
+	// PMM - this is used by the medic commander (possibly by the carrier) to find a good spawn point
+	// if the startpoint is bad, try above the startpoint for a bit
+	/*bool FindSpawnPoint( const Vector &in startpoint, const Vector &in mins, const Vector &in maxs, Vector &out spawnpoint, bool drop = false )
+	{
+		spawnpoint = startpoint;
+
+		// drop first
+		if( !drop or !M_droptofloor_generic(spawnpoint, mins, maxs, false, null, 0, false, spawnpoint) ) //MASK_MONSTERSOLID
+		{
+			spawnpoint = startpoint;
+
+			// fix stuck if we couldn't drop initially
+			/*if (G_FixStuckObject_Generic(spawnpoint, mins, maxs, [] (const Vector &start, const Vector &mins, const Vector &maxs, const Vector &end) {
+					return gi.trace(start, mins, maxs, end, nullptr, MASK_MONSTERSOLID);
+				}) == stuck_result_t::NO_GOOD_POSITION)
+				return false;
+			
+			//if( !G_FixStuckObject_Generic(spawnpoint, mins, maxs) )
+				//return false;
+
+			// fixed, so drop again
+			if( drop and !M_droptofloor_generic(spawnpoint, mins, maxs, false, null, 0, false, spawnpoint) ) //MASK_MONSTERSOLID
+				return false; // ???
+		}
+
+		return true;
+	}*/
+
+	bool FindSpawnPoint( const Vector &in startpoint, const Vector &in mins, const Vector &in maxs, Vector &out spawnpoint, string sClassname, bool drop = false )
+	{
+		g_Game.AlertMessage( at_notice, "FindSpawnPoint for: %1\n", sClassname );
+		spawnpoint = startpoint;
+
+		// drop first
+		if( !drop or !M_droptofloor_generic(spawnpoint, mins, maxs, false, null, 0, false, spawnpoint, sClassname) ) //MASK_MONSTERSOLID
+		{
+			spawnpoint = startpoint;
+
+			// fix stuck if we couldn't drop initially
+			q2::TraceFn@ trace = function( const Vector &in start, const Vector &in mins, const Vector &in maxs, const Vector &in end )
+			{
+				//HULL_NUMBER hullNumber = q2::GetClosestHullNumber( mins, maxs );
+				HULL_NUMBER hullNumber = head_hull;
+				TraceResult tr;
+				g_Utility.TraceHull( start, end, dont_ignore_monsters, hullNumber, null, tr );
+				q2::StuckTrace result;
+				result.startsolid = tr.fStartSolid != 0;
+				result.endpos = tr.vecEndPos;
+				result.planeNormal = tr.vecPlaneNormal;
+				return @result;
+			};
+
+			int iResult = q2::G_FixStuckObject_Generic( spawnpoint, mins, maxs, trace, spawnpoint );
+			switch( iResult )
+			{
+				case q2::GOOD_POSITION:
+				{
+					g_Game.AlertMessage( at_notice, "GOOD_POSITION!\n" );
+					break;
+				}
+
+				case q2::FIXED:
+				{
+					g_Game.AlertMessage( at_notice, "FIXED!\n" );
+					break;
+				}
+
+				case q2::NO_GOOD_POSITION:
+				{
+					g_Game.AlertMessage( at_notice, "NO_GOOD_POSITION!\n" );
+					break;
+				}
+			}
+
+			//if( q2::G_FixStuckObject_Generic(spawnpoint, mins, maxs, trace) == q2::NO_GOOD_POSITION )
+			if( iResult == q2::NO_GOOD_POSITION )
+				return false;
+
+			// fixed, so drop again
+			if( drop and !M_droptofloor_generic(spawnpoint, mins, maxs, false, null, 0, false, spawnpoint, sClassname) ) //MASK_MONSTERSOLID
+				return false; // ???
+		}
+
+		return true;
+	}
+
+	//from quake 2 rerelease
+	bool M_droptofloor_generic( Vector &in origin, const Vector &in mins, const Vector &in maxs, bool ceiling, edict_t@ ignore, int mask, bool bAllowPartial, Vector &out vecOut, string sClassname ) //contents_t mask
+	{
+		Vector end;
+		TraceResult trace;
+
+		if( npc_q2medic::USE_EXPENSIVE_HULLCHECKS )
+			TraceMonster( sClassname, origin, origin, trace );
+		else
+		{
+			g_Utility.TraceLine( origin, origin, dont_ignore_monsters, ignore, trace );
+			g_Utility.FindHullIntersection( origin, trace, trace, mins, maxs, ignore ); //self.edict() ??
+		}
+
+		//if (gi.trace(origin, mins, maxs, origin, ignore, mask).startsolid)
+		if( trace.fStartSolid != 0 )
+		{
+			if( !ceiling )
+				origin.z += 1.0;
+			else
+				origin.z -= 1.0;
+		}
+
+		if( !ceiling )
+		{
+			end = origin;
+			end.z -= 256;
+		}
+		else
+		{
+			end = origin;
+			end.z += 256;
+		}
+
+		if( npc_q2medic::USE_EXPENSIVE_HULLCHECKS )
+			TraceMonster( sClassname, origin, end, trace );
+		else
+		{
+			g_Utility.TraceLine( origin, end, dont_ignore_monsters, ignore, trace ); //trace = gi.trace(origin, mins, maxs, end, ignore, mask);
+			g_Utility.FindHullIntersection( origin, trace, trace, mins, maxs, ignore ); //self.edict() ??
+		}
+
+		if( trace.flFraction == 1.0 or trace.fAllSolid != 0 or (!bAllowPartial and trace.fStartSolid != 0) )
+			return false;
+
+		vecOut = trace.vecEndPos; //origin
+
+		return true;
+	}
+
+	//from quake 2 rerelease
+	// PMM - checks volume to make sure we can spawn a monster there (is it solid?)
+	//
+	// This is all fliers should need
+	bool CheckSpawnPoint( const Vector &in origin, const Vector &in mins, const Vector &in maxs, string sClassname = "" )
 	{
 		TraceResult tr;
 
-		Vector spot1 = self.EyePosition();
-		Vector spot2 = pTarget.EyePosition();
-
-		// see through other monsters
-		g_Utility.TraceLine( spot1, spot2, ignore_monsters, ignore_glass, self.edict(), tr );
-
-		if( tr.fInOpen != 0 and tr.fInWater != 0 )
+		if( mins == g_vecZero or maxs == g_vecZero )
 			return false;
 
-		if( tr.flFraction == 1.0 )
+		if( npc_q2medic::USE_EXPENSIVE_HULLCHECKS and !sClassname.IsEmpty() )
+			TraceMonster( sClassname, origin, origin, tr );
+		else
+		{
+			g_Utility.TraceLine( origin, origin, dont_ignore_monsters, null, tr ); //tr = gi.trace(origin, mins, maxs, origin, nullptr, MASK_MONSTERSOLID);
+			g_Utility.FindHullIntersection( origin, tr, tr, mins, maxs, null ); //self.edict() ??
+		}
+
+		if( tr.fStartSolid != 0 or tr.fAllSolid != 0 )
+			return false;
+
+		if( !tr.pHit.vars.ClassNameIs("worldspawn") ) //tr.ent != world
+			return false;
+
+		return true;
+	}
+
+	//from quake 2 rerelease
+	// PMM - used for walking monsters
+	//  checks:
+	//		1)	is there a ground within the specified height of the origin?
+	//		2)	is the ground non-water?
+	//		3)	is the ground flat enough to walk on?
+	//
+	bool CheckGroundSpawnPoint( const Vector &in origin, const Vector &in entMins, const Vector &in entMaxs, float height, float gravity, string sClassname = "" )
+	{
+		if( !CheckSpawnPoint(origin, entMins, entMaxs, sClassname) )
+			return false;
+
+		if( M_CheckBottom_Fast_Generic(origin + entMins, origin + entMaxs, false) )
+			return true;
+
+		if( M_CheckBottom_Slow_Generic(origin, entMins, entMaxs, null, 0, false, false) ) //MASK_MONSTERSOLID
 			return true;
 
 		return false;
+	}
+
+	//from quake 2 rerelease
+	//Returns false if any part of the bottom of the entity is off an edge that is not a staircase.
+	bool M_CheckBottom_Fast_Generic( const Vector &in absmins, const Vector &in absmaxs, bool ceiling )
+	{
+		//  FIXME - this will only handle 0,0,1 and 0,0,-1 gravity vectors
+		Vector start;
+
+		start.z = absmins.z - 1;
+
+		if( ceiling )
+			start.z = absmaxs.z + 1;
+
+		for( int x = 0; x <= 1; x++ )
+		{
+			for( int y = 0; y <= 1; y++ )
+			{
+				start.x = (x != 0) ? absmaxs.x : absmins.x;
+				start.y = (y != 0) ? absmaxs.y : absmins.y;
+
+				if( g_EngineFuncs.PointContents(start) != CONTENTS_SOLID )
+					return false;
+			}
+		}
+
+		return true; // we got out easy
+	}
+
+	//from quake 2 rerelease
+	bool M_CheckBottom_Slow_Generic( const Vector &in origin, const Vector &in mins, const Vector &in maxs, edict_t@ ignore, int mask, bool ceiling, bool allow_any_step_height )
+	{
+		Vector start;
+
+		// check it for real...
+		Vector step_quadrant_size = (maxs - mins) * 0.5;
+		step_quadrant_size.z = 0;
+
+		Vector half_step_quadrant = step_quadrant_size * 0.5;
+		Vector half_step_quadrant_mins = -half_step_quadrant;
+
+		Vector stop;
+
+		start.x = stop.x = origin.x;
+		start.y = stop.y = origin.y;
+
+		if( !ceiling )
+		{
+			start.z = origin.z + mins.z;
+			stop.z = start.z - Q2_STEPSIZE * 2;
+		}
+		else
+		{
+			start.z = origin.z + maxs.z;
+			stop.z = start.z + Q2_STEPSIZE * 2;
+		}
+
+		Vector mins_no_z = mins;
+		Vector maxs_no_z = maxs;
+		mins_no_z.z = maxs_no_z.z = 0;
+
+		TraceResult trace;
+
+		g_Utility.TraceLine( start, stop, dont_ignore_monsters, ignore, trace ); //gi.trace(start, mins_no_z, maxs_no_z, stop, ignore.edict(), mask);
+		g_Utility.FindHullIntersection( start, trace, trace, mins_no_z, maxs_no_z, ignore ); //self.edict() ??
+
+		if( trace.flFraction == 1.0 )
+			return false;
+
+		if( allow_any_step_height )
+			return true;
+
+		start.x = stop.x = origin.x + ((mins.x + maxs.x) * 0.5);
+		start.y = stop.y = origin.y + ((mins.y + maxs.y) * 0.5);
+
+		float mid = trace.vecEndPos.z;
+
+		// the corners must be within 16 of the midpoint
+		for( int x = 0; x <= 1; x++ )
+		{
+			for( int y = 0; y <= 1; y++ )
+			{
+				Vector quadrant_start = start;
+
+				if( x != 0 )
+					quadrant_start.x += half_step_quadrant.x;
+				else
+					quadrant_start.x -= half_step_quadrant.x;
+
+				if( y != 0 )
+					quadrant_start.y += half_step_quadrant.y;
+				else
+					quadrant_start.y -= half_step_quadrant.y;
+
+				Vector quadrant_end = quadrant_start;
+				quadrant_end.z = stop.z;
+
+				g_Utility.TraceLine( quadrant_start, quadrant_end, dont_ignore_monsters, ignore, trace ); //gi.trace(quadrant_start, half_step_quadrant_mins, half_step_quadrant, quadrant_end, ignore.edict(), mask);
+				g_Utility.FindHullIntersection( start, trace, trace, half_step_quadrant_mins, half_step_quadrant, ignore ); //self.edict() ??
+
+				//  FIXME - this will only handle 0,0,1 and 0,0,-1 gravity vectors
+				if( ceiling )
+				{
+					if( trace.flFraction == 1.0 or (trace.vecEndPos.z - mid) > Q2_STEPSIZE )
+						return false;
+				}
+				else
+				{
+					if( trace.flFraction == 1.0 or (mid - trace.vecEndPos.z) > Q2_STEPSIZE )
+						return false;
+				}
+			}
+		}
+
+		return true;
+	}
+
+	//from quake 2 rerelease
+	CBaseEntity@ CreateGroundMonster( const Vector &in origin, const Vector &in angles, const Vector &in entMins, const Vector &in entMaxs, const string &in sClassname, float height )
+	{
+		CBaseEntity@ newEnt = null;
+
+		// check the ground to make sure it's there, it's relatively flat, and it's not toxic
+		if( !CheckGroundSpawnPoint(origin, entMins, entMaxs, height, -1.0, sClassname) )
+			return null;
+
+		@newEnt = CreateMonster( origin, angles, sClassname );
+		if( newEnt is null )
+			return null;
+
+		return newEnt;
+	}
+
+	//from quake 2 rerelease
+	CBaseEntity@ CreateMonster( const Vector &in vecOrigin, const Vector &in vecAngles, const string &in sClassname )
+	{
+		CBaseEntity@ cbeNewEnt = g_EntityFuncs.Create( sClassname, vecOrigin, vecAngles, true, null );
+		CBaseQ2NPC@ pNewEnt = q2npc::GetQ2Pointer( cbeNewEnt );
+
+		pNewEnt.monsterinfo.aiflags |= q2::AI_DO_NOT_COUNT;
+
+		//pNewEnt->gravityVector = { 0, 0, -1 };
+
+		g_EntityFuncs.DispatchSpawn( pNewEnt.self.edict() );
+		//pNewEnt->s.renderfx |= RF_IR_VISIBLE;
+
+		return cbeNewEnt;
+	}
+
+	//from quake 2 rerelease
+	// this returns a randomly selected coop player who is visible to self
+	// returns nullptr if bad
+	CBaseEntity@ PickCoopTarget( CBaseEntity@ pEntity )
+	{
+		array<CBasePlayer@> arrspTargets;
+		int num_targets = 0, targetID;
+		CBaseEntity@ ent;
+
+		//if we're not in coop, this is a noop
+		if( !q2::IsCoop() )
+			return null;
+
+		/*//targets = (edict_t **) alloca(sizeof(edict_t *) * game.maxclients);
+
+		for( int i = 1; i <= g_Engine.maxClients; ++i )
+		{
+			CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex( i );
+
+			if( pPlayer !is null and pPlayer.IsAlive() )
+			{
+				if( visible(pEntity, pPlayer) )
+					arrspTargets[num_targets++] = pPlayer;
+			}
+		}
+
+		if (!num_targets)
+			return null;
+
+		// get a number from 0 to (num_targets-1)
+		targetID = irandom(num_targets);*/
+
+		return null; //arrspTargets[ targetID ];
+	}
+
+	//from quake 2 rerelease
+	Vector M_ProjectFlashSource( const Vector &in offset, const Vector &in forward, const Vector &in right )
+	{
+		return q2::G_ProjectSource( pev.origin, (pev.scale != 0) ? (offset * pev.scale) : offset, forward, right );
+	}
+
+	bool M_CheckGib( const int &in mod )
+	{
+		if( pev.deadflag != DEAD_NO )
+		{
+			if( mod == q2::MOD_CRUSH )
+				return true;
+		}
+
+		return pev.health <= m_flGibHealth;
+	}
+
+	void WalkMove( float flDist )
+	{
+		g_EngineFuncs.WalkMove( self.edict(), self.pev.angles.y, flDist, WALKMOVE_NORMAL );
 	}
 
 	bool HasFlags( int iFlagVariable, int iFlags )
@@ -1552,6 +2576,17 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		pCustom.SetKeyvalue( q2npc::KVN_MASS, iMass );
 	}
 
+	float realrange( CBaseEntity@ pOther )
+	{
+		Vector dir;
+
+		dir = pev.origin - pOther.pev.origin;
+
+		return dir.Length();
+	}
+
+	float hz( float hertz ) { return 1.0 / hertz; }
+
 	float fabs( float x )
 	{
 		return ( (x) > 0 ? (x) : 0 - (x) );
@@ -1570,6 +2605,51 @@ float Q_fabs (float f)
 	return * ( float * ) &tmp;
 #endif
 }
+*/
+	void TraceMonster( string sClassname, Vector vecStart, Vector vecEnd, TraceResult &out trace )
+	{
+		CBaseEntity@ pNewEnt = g_EntityFuncs.Create( sClassname, g_vecZero, g_vecZero, true );
+		CBaseQ2NPC@ pMonster = q2npc::GetQ2Pointer( pNewEnt );
+
+		pMonster.monsterinfo.aiflags |= q2::AI_DO_NOT_COUNT;
+		pMonster.pev.spawnflags = 16; //prisoner
+
+		g_EntityFuncs.DispatchSpawn( pMonster.self.edict() );
+
+		g_Utility.TraceMonsterHull( pMonster.self.edict(), vecStart, vecEnd, dont_ignore_monsters, pMonster.self.edict(), trace );
+
+		g_EntityFuncs.Remove( pMonster.self );
+	}
+
+	//TEST
+	CBaseEntity@ CreateTraceDummy( const Vector &in origin, const Vector &in mins, const Vector &in maxs )
+	{
+		dictionary keys;
+		keys[ "origin" ] = origin.ToString();
+		keys[ "targetname" ] = "trace_dummy";
+
+		CBaseEntity@ pDummy = g_EntityFuncs.CreateEntity( "info_target", keys, false );
+		if( pDummy !is null )
+		{
+			pDummy.pev.mins = mins;
+			pDummy.pev.maxs = maxs;
+			pDummy.pev.absmin = origin + mins;
+			pDummy.pev.absmax = origin + maxs;
+		}
+
+		return pDummy;
+	}
+
+/*
+CBaseEntity@ pTraceDummy = CreateTraceDummy( vecStart, mins, maxs );
+g_EntityFuncs.DispatchSpawn( pTraceDummy.edict() );
+
+TraceResult tr;
+g_Utility.TraceMonsterHull( pTraceDummy.edict(), vecStart, vecEnd, dont_ignore_monsters, pTraceDummy.edict(), tr ); 
+
+//checks here
+
+g_EntityFuncs.Remove( pTraceDummy );
 */
 }
 

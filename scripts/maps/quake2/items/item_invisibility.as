@@ -4,10 +4,12 @@ namespace q2items
 const string INVISITEM_NAME				= "item_invisibility";
 const string INVISWEAP_NAME			= "weapon_q2invisibility";
 const float INVIS_DURATION				= 30.0;
+const float INVISIBILITY_TIME			= 2.0; //seconds until we are fully invisible after making a racket
 const float INVIS_RESPAWN				= 300.0;
 const string MODEL_INVIS					= "models/quake2/items/cloaker.mdl";
 const string INVIS_KVN						= "$i_q2invisdamage";
-const string INVIS_KVN_TIME				= "$f_q2invistime";
+const string INVIS_KVN_TIME				= "$f_q2invistime"; //client->invisible_time
+const string INVIS_KVN_FADETIME		= "$f_q2invisfadetime"; //client->invisibility_fade_time
 const string INVIS_ICON						= "quake2/pics/p_cloaker.spr";
 
 final class item_invisibility : ScriptBaseItemEntity, item_q2pickup
@@ -145,29 +147,69 @@ void InvisActivate( CBasePlayer@ pPlayer )
 	pCustom.SetKeyvalue( INVIS_KVN, 1 );
 	pCustom.SetKeyvalue( INVIS_KVN_TIME, g_Engine.time + flDuration ); //start the fading sound
 
+	if( IsItemActive(pPlayer, q2::IT_ITEM_SILENCER) )
+		pCustom.SetKeyvalue( INVIS_KVN_FADETIME, g_Engine.time + (INVISIBILITY_TIME / 5) );
+	else
+		pCustom.SetKeyvalue( INVIS_KVN_FADETIME, g_Engine.time + INVISIBILITY_TIME );
+
 	pPlayer.pev.flags |= FL_NOTARGET;
-	pPlayer.pev.effects |= EF_NODRAW;
+	pPlayer.pev.rendermode = kRenderTransColor;
+	pPlayer.pev.renderamt = 255;
+	//pPlayer.pev.renderfx = 0;
+	//pPlayer.pev.effects |= EF_NODRAW;
+}
+
+void RunInvisibility( CBasePlayer@ pPlayer )
+{
+	if( IsItemActive(pPlayer, q2::IT_ITEM_INVISIBILITY) )
+	{
+		//g_Game.AlertMessage( at_notice, "IT_ITEM_INVISIBILITY!\n" );
+		//if (ent->client->invisible_time > level.time)
+		{
+			CustomKeyvalues@ pCustom = pPlayer.GetCustomKeyvalues();
+			float flInvisibilityFadeTime = pCustom.GetKeyvalue(INVIS_KVN_FADETIME).GetFloat();
+
+			if( flInvisibilityFadeTime <= g_Engine.time)
+			{
+				if( pPlayer.pev.rendermode != kRenderTransColor )
+					pPlayer.pev.rendermode = kRenderTransColor;
+
+				pPlayer.pev.renderamt = 255 * 0.1;
+				pPlayer.pev.flags |= FL_NOTARGET;
+			}
+			else
+			{
+				if( pPlayer.pev.rendermode != kRenderTransColor )
+					pPlayer.pev.rendermode = kRenderTransColor;
+
+				float x = (flInvisibilityFadeTime - g_Engine.time) / INVISIBILITY_TIME;
+				pPlayer.pev.renderamt = Math.clamp( (255 * 0.1), 255, x * 255 );
+				pPlayer.pev.flags &= ~FL_NOTARGET;
+				//g_Game.AlertMessage( at_notice, "RunInvisibility x: %1, renderamt: %2\n", x, pPlayer.pev.renderamt );
+			}
+		}
+	}
 }
 
 //G_AddBlend(0.8f, 0.8f, 0.8f, 0.08f, ent->client->ps.screen_blend);
 void FadeInvisibility( CBasePlayer@ pPlayer )
 {
 	CustomKeyvalues@ pCustom = pPlayer.GetCustomKeyvalues();
-	float flItemFadeTime= pCustom.GetKeyvalue(INVIS_KVN_TIME).GetFloat();
+	float flItemEffectTime= pCustom.GetKeyvalue(INVIS_KVN_TIME).GetFloat();
 
-	if( flItemFadeTime > 0.0 )
+	if( flItemEffectTime > 0.0 )
 	{
 		int iItemState = pCustom.GetKeyvalue(INVIS_KVN).GetInteger();
 
-		if( g_Engine.time > (flItemFadeTime - 2.983) and iItemState == 1 )
+		if( g_Engine.time > (flItemEffectTime - 2.983) and iItemState == 1 )
 		{
 			InvisFadeMessage( pPlayer );
 			g_SoundSystem.EmitSound( pPlayer.edict(), CHAN_AUTO, "quake2/items/protect2.wav", VOL_NORM, ATTN_NORM ); //CHAN_ITEM
 			pCustom.SetKeyvalue( INVIS_KVN, 2 );
 		}
-		else if( g_Engine.time > flItemFadeTime and iItemState == 2 )
+		else if( g_Engine.time > flItemEffectTime and iItemState == 2 )
 		{
-			flItemFadeTime = 0.0;
+			flItemEffectTime = 0.0;
 			InvisResetPlayer( pPlayer );
 		}
 	}
@@ -199,11 +241,15 @@ void InvisResetPlayer( CBasePlayer@ pPlayer )
 	CustomKeyvalues@ pCustom = pPlayer.GetCustomKeyvalues();
 	pCustom.SetKeyvalue( INVIS_KVN, 0 );
 	pCustom.SetKeyvalue( INVIS_KVN_TIME, 0.0 );
+	pCustom.SetKeyvalue( INVIS_KVN_FADETIME, 0.0 );
 
 	pPlayer.pev.flags &= ~FL_NOTARGET;
-	pPlayer.pev.effects &= ~EF_NODRAW;
+	pPlayer.pev.rendermode = kRenderNormal;
+	pPlayer.pev.renderamt = 0;
+	//pPlayer.pev.renderfx = 0;
+	//pPlayer.pev.effects &= ~EF_NODRAW;
 
-	g_PlayerFuncs.HudToggleElement( pPlayer, q2items::INVIS_HUD_CHANNEL, false );
+	g_PlayerFuncs.HudToggleElement( pPlayer, INVIS_HUD_CHANNEL, false );
 }
 
 } //end of namespace q2items

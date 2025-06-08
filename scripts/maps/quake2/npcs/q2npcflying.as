@@ -85,12 +85,12 @@ mixin class CBaseQ1Flying
 			return;
 		}
 
-		if( q2npc::g_iChaosMode == q2npc::CHAOS_LEVEL1 )
+		if( q2npc::g_iChaosMode == q2::CHAOS_LEVEL1 )
 		{
-			if( q2npc::g_iDifficulty < q2npc::DIFF_NIGHTMARE )
-				m_iWeaponType = Math.RandomLong( q2npc::WEAPON_BULLET, q2npc::WEAPON_RAILGUN );
+			if( q2npc::g_iDifficulty < q2::DIFF_NIGHTMARE )
+				m_iWeaponType = Math.RandomLong( q2::WEAPON_BULLET, q2::WEAPON_RAILGUN );
 			else
-				m_iWeaponType = Math.RandomLong( q2npc::WEAPON_BULLET, q2npc::WEAPON_BFG );
+				m_iWeaponType = Math.RandomLong( q2::WEAPON_BULLET, q2::WEAPON_BFG );
 		}
 
 		MonsterSpawn();
@@ -275,7 +275,7 @@ mixin class CBaseQ1Flying
 	{
 		m_iRefireCount = 0; // refire count for nightmare
 
-		if( q2npc::g_iDifficulty != q2npc::DIFF_NIGHTMARE )
+		if( q2npc::g_iDifficulty != q2::DIFF_NIGHTMARE )
 			m_flAttackFinished = g_Engine.time + flFinishTime;
 	}
 
@@ -946,7 +946,7 @@ mixin class CBaseQ1Flying
 	//for chaos mode
 	void monster_fire_weapon( int iWeaponType, Vector vecMuzzle, Vector vecAim, float flDamage, float flSpeed = 600.0, float flRightAdjust = 0.0, float flUpAdjust = 0.0 )
 	{
-		if( q2npc::g_iChaosMode == q2npc::CHAOS_LEVEL1 )
+		if( q2npc::g_iChaosMode == q2::CHAOS_LEVEL1 )
 			iWeaponType = m_iWeaponType;
 		else if( (m_iWeaponType & 2048) != 0 )
 		{
@@ -954,61 +954,61 @@ mixin class CBaseQ1Flying
 			m_iWeaponType &= ~2048;
 			iWeaponType = m_iWeaponType;
 		}
-		else if( q2npc::g_iChaosMode == q2npc::CHAOS_LEVEL2 )
+		else if( q2npc::g_iChaosMode == q2::CHAOS_LEVEL2 )
 		{
-			if( q2npc::g_iDifficulty < q2npc::DIFF_NIGHTMARE )
-				iWeaponType = Math.RandomLong( q2npc::WEAPON_BULLET, q2npc::WEAPON_RAILGUN );
+			if( q2npc::g_iDifficulty < q2::DIFF_NIGHTMARE )
+				iWeaponType = Math.RandomLong( q2::WEAPON_BULLET, q2::WEAPON_RAILGUN );
 			else
-				iWeaponType = Math.RandomLong( q2npc::WEAPON_BULLET, q2npc::WEAPON_BFG );
+				iWeaponType = Math.RandomLong( q2::WEAPON_BULLET, q2::WEAPON_BFG );
 		}
 
 		switch( iWeaponType )
 		{
-			case q2npc::WEAPON_BULLET:
+			case q2::WEAPON_BULLET:
 			{
-				q2npc::monster_fire_bullet( self, vecMuzzle, vecAim, flDamage );
+				q2::monster_fire_bullet( self, vecMuzzle, vecAim, flDamage );
 				break;
 			}
 
-			case q2npc::WEAPON_SHOTGUN:
+			case q2::WEAPON_SHOTGUN:
 			{
-				q2npc::monster_fire_shotgun( self, vecMuzzle, vecAim, flDamage );
+				q2::monster_fire_shotgun( self, vecMuzzle, vecAim, flDamage );
 				break;
 			}
 
-			case q2npc::WEAPON_BLASTER:
+			case q2::WEAPON_BLASTER:
 			{
-				q2npc::monster_fire_blaster( self, vecMuzzle, vecAim, flDamage, flSpeed, true );
+				q2::monster_fire_blaster( self, vecMuzzle, vecAim, flDamage, flSpeed, true );
 				break;
 			}
 
-			case q2npc::WEAPON_GRENADE:
+			case q2::WEAPON_GRENADE:
 			{
-				q2npc::monster_fire_grenade( self, vecMuzzle, vecAim, flDamage, flSpeed, flRightAdjust, flUpAdjust );
+				q2::monster_fire_grenade( self, vecMuzzle, vecAim, flDamage, flSpeed, flRightAdjust, flUpAdjust );
 				break;
 			}
 
-			case q2npc::WEAPON_ROCKET:
+			case q2::WEAPON_ROCKET:
 			{
-				q2npc::monster_fire_rocket( self, vecMuzzle, vecAim, flDamage, flSpeed );
+				q2::monster_fire_rocket( self, vecMuzzle, vecAim, flDamage, flSpeed );
 				break;
 			}
 
-			case q2npc::WEAPON_HEATSEEKING:
+			case q2::WEAPON_HEATSEEKING:
 			{
-				q2npc::monster_fire_rocket( self, vecMuzzle, vecAim, flDamage, flSpeed, true, m_flHeatTurnRate );
+				q2::monster_fire_rocket( self, vecMuzzle, vecAim, flDamage, flSpeed, true, m_flHeatTurnRate );
 				break;
 			}
 
-			case q2npc::WEAPON_RAILGUN:
+			case q2::WEAPON_RAILGUN:
 			{
-				q2npc::monster_fire_railgun( self, vecMuzzle, vecAim, flDamage );
+				q2::monster_fire_railgun( self, vecMuzzle, vecAim, flDamage );
 				break;
 			}
 
-			case q2npc::WEAPON_BFG:
+			case q2::WEAPON_BFG:
 			{
-				q2npc::monster_fire_bfg( self, vecMuzzle, vecAim, flDamage, flSpeed, 200 );
+				q2::monster_fire_bfg( self, vecMuzzle, vecAim, flDamage, flSpeed, 200 );
 				break;
 			}
 		}
@@ -1068,8 +1068,8 @@ mixin class CBaseQ1Flying
 
 		// do the damage
 		//T_Damage (tr.ent, self, self, dir, point, vec3_origin, flDamage, flKick/2, DAMAGE_NO_KNOCKBACK, MOD_HIT);
-		//q2::T_Damage( g_EntityFuncs.Instance(tr.pHit), self, self, dir, point, g_vecZero, flDamage, flKick/2, 0 );
-		g_EntityFuncs.Instance(tr.pHit).TakeDamage( self.pev, self.pev, flDamage, DMG_GENERIC );
+		q2::T_Damage( g_EntityFuncs.Instance(tr.pHit), self, self, dir, point, g_vecZero, flDamage, flKick/2, 0, q2::MOD_HIT );
+		//g_EntityFuncs.Instance(tr.pHit).TakeDamage( self.pev, self.pev, flDamage, DMG_GENERIC );
 
 		//if( !(tr.ent->svflags & SVF_MONSTER) and (!tr.ent->client) )
 		if( !tr.pHit.vars.FlagBitSet(FL_MONSTER|FL_CLIENT) )
@@ -1086,9 +1086,13 @@ mixin class CBaseQ1Flying
 		return true;
 	}
 
+	//TODO fix this ??
+	void SetSkin() { MonsterSetSkin(); }
+	void MonsterSetSkin() {}
+
 	bool M_ShouldReactToPain()
 	{
-		if( q2npc::g_iDifficulty >= q2npc::DIFF_NIGHTMARE )
+		if( q2npc::g_iDifficulty >= q2::DIFF_NIGHTMARE )
 			return false;
 
 		return true;

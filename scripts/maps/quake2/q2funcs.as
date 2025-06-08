@@ -39,13 +39,13 @@ Vector slerp( const Vector &in vecFrom, const Vector &in vecTo, float t )
 }
 
 //from quake 2 rerelease
-void T_RadiusDamage( CBaseEntity@ pInflictor, CBaseEntity@ pAttacker, float flDamage, CBaseEntity@ pIgnore, float flRadius, int bitsDamageType, int mod = MOD_UNKNOWN )
+void T_RadiusDamage( CBaseEntity@ pInflictor, CBaseEntity@ pAttacker, float flDamage, CBaseEntity@ pIgnore, float flRadius, int dflags, int iMeansOfDeath = MOD_UNKNOWN )
 {
 	if( pIgnore is null ) @pIgnore = pInflictor;
 
 	float flPoints;
 	CBaseEntity@ pEnt = null;
-	Vector vecWhat;
+	Vector vecOffsetToInflictor;
 	Vector vecDir;
 	Vector vecInflictorCenter;
 
@@ -64,15 +64,15 @@ void T_RadiusDamage( CBaseEntity@ pInflictor, CBaseEntity@ pAttacker, float flDa
 			continue;
 
 		if( pEnt.pev.solid == SOLID_BSP /*and pEnt.linked*/ )
-			vecWhat = closest_point_to_box( vecInflictorCenter, pEnt.pev.absmin, pEnt.pev.absmax );
+			vecOffsetToInflictor = closest_point_to_box( vecInflictorCenter, pEnt.pev.absmin, pEnt.pev.absmax );
 		else
 		{
-			vecWhat = pEnt.pev.mins + pEnt.pev.maxs;
-			vecWhat = pEnt.pev.origin + (vecWhat * 0.5);
+			vecOffsetToInflictor = pEnt.pev.mins + pEnt.pev.maxs;
+			vecOffsetToInflictor = pEnt.pev.origin + (vecOffsetToInflictor * 0.5);
 		}
 
-		vecWhat = vecInflictorCenter - vecWhat;
-		flPoints = flDamage - 0.5 * vecWhat.Length();
+		vecOffsetToInflictor = vecInflictorCenter - vecOffsetToInflictor;
+		flPoints = flDamage - 0.5 * vecOffsetToInflictor.Length();
 
 		if( pEnt is pAttacker )
 			flPoints *= 0.5;
@@ -83,16 +83,38 @@ void T_RadiusDamage( CBaseEntity@ pInflictor, CBaseEntity@ pAttacker, float flDa
 			{
 				vecDir = (pEnt.pev.origin - vecInflictorCenter).Normalize();
 
-				T_Damage( pEnt, pInflictor, pAttacker, vecDir, closest_point_to_box(vecInflictorCenter, pEnt.pev.absmin, pEnt.pev.absmax), vecDir, flPoints, flPoints, bitsDamageType/* | DAMAGE_RADIUS*/, mod );
-				//if( !((pEnt.pev.FlagBitSet(FL_CLIENT) and pEnt !is pAttacker) and !q2::PVP) ) //deals damage to players otherwise
-					//pEnt.TakeDamage( pInflictor.pev, pAttacker.pev, flPoints, bitsDamageType );
+				T_Damage( pEnt, pInflictor, pAttacker, vecDir, closest_point_to_box(vecInflictorCenter, pEnt.pev.absmin, pEnt.pev.absmax), vecDir, flPoints, flPoints, dflags | q2::DAMAGE_RADIUS, iMeansOfDeath );
 			}
 		}
 	}
 }
 
 //from quake 2
-void T_Damage( CBaseEntity@ pTarget, CBaseEntity@ pInflictor, CBaseEntity@ pAttacker, Vector vecDir, Vector vecPoint, Vector vecNormal, float flDamage, float flKnockback, int bitsDamageType, int mod = MOD_UNKNOWN )
+/*
+============
+T_Damage
+
+pTarget		entity that is being damaged
+pInflictor	entity that is causing the damage
+pAttacker	entity that caused the pInflictor to damage pTarget
+	example: pTarget=monster, pInflictor=rocket, pAttacker=player
+
+vecDir			direction of the attack
+vecPoint		point at which the damage is being inflicted
+vecNormal		normal vector from that point
+flDamage		amount of damage being inflicted
+flKnockback	force to be applied against targ as a result of the damage
+
+dflags		these flags are used to control how T_Damage works
+	DAMAGE_RADIUS			damage was indirect (from a nearby explosion)
+	DAMAGE_NO_ARMOR			armor does not protect from this damage
+	DAMAGE_ENERGY			damage is from an energy based weapon
+	DAMAGE_NO_KNOCKBACK		do not affect velocity, just view angles
+	DAMAGE_BULLET			damage is from a bullet (used for ricochets)
+	DAMAGE_NO_PROTECTION	kills godmode, armor, everything
+============
+*/
+void T_Damage( CBaseEntity@ pTarget, CBaseEntity@ pInflictor, CBaseEntity@ pAttacker, Vector vecDir, Vector vecPoint, Vector vecNormal, float flDamage, float flKnockback, int dflags, int iMeansOfDeath )
 {
 	if( pTarget.pev.takedamage == DAMAGE_NO )
 		return;
@@ -101,7 +123,7 @@ void T_Damage( CBaseEntity@ pTarget, CBaseEntity@ pInflictor, CBaseEntity@ pAtta
 	float flSave;
 	float flAsave;
 	float flPsave;
-	//int te_sparks;
+	int te_sparks;
 
 	// friendly fire avoidance
 	// if enabled you can't hurt teammates (but you can hurt yourself)
@@ -114,48 +136,54 @@ void T_Damage( CBaseEntity@ pTarget, CBaseEntity@ pInflictor, CBaseEntity@ pAtta
 		}
 	}
 
-	//meansOfDeath = mod;
-
 	// easy mode takes half damage
-	if( q2npc::g_iDifficulty == q2npc::DIFF_EASY and !q2::PVP and pTarget.pev.FlagBitSet(FL_CLIENT) )
+	if( q2npc::g_iDifficulty == q2::DIFF_EASY and !q2::PVP and pTarget.pev.FlagBitSet(FL_CLIENT) )
 	{
 		flDamage *= 0.5;
 		if( flDamage <= 0.0 )
 			flDamage = 1.0;
 	}
-/*
-	if( (bitsDamageType & DAMAGE_BULLET) != 0 )
-		te_sparks = TE_BULLET_SPARKS;
+
+	if( HasFlags(dflags, DAMAGE_BULLET) )
+		te_sparks = q2::TE_BULLET_SPARKS;
 	else
-		te_sparks = TE_SPARKS;*/
+		te_sparks = q2::TE_SPARKS;
 
 	vecDir = vecDir.Normalize();
-/*
-// bonus damage for suprising a monster
-	if( !(bitsDamageType & DAMAGE_RADIUS) and (pTarget.svflags & SVF_MONSTER) and pAttacker.pev.FlagBitSet(FL_CLIENT) and (!pTarget.enemy) and pTarget.pev.health > 0 )
+
+	// bonus damage for suprising a monster
+	CBaseQ2NPC@ pMonster = q2npc::GetQ2Pointer( pTarget );
+	if( !HasFlags(dflags, q2::DAMAGE_RADIUS) and pTarget.pev.FlagBitSet(FL_MONSTER) and pAttacker.pev.FlagBitSet(FL_CLIENT) and (!pTarget.MyMonsterPointer().m_hEnemy.IsValid() or (pMonster !is null and pMonster.monsterinfo.surprise_time == g_Engine.time)) and pTarget.pev.health > 0 )
+	{
 		flDamage *= 2.0;
 
-	if( pTarget.flags & FL_NO_KNOCKBACK )
-		flKnockback = 0.0;
-*/
-	//figure momentum add
-	if( (bitsDamageType & DMG_LAUNCH) != 0 )
-	{
-		bitsDamageType &= ~DMG_LAUNCH;
+		if( pMonster !is null )
+			pMonster.monsterinfo.surprise_time = g_Engine.time;
+	}
 
+	if( HasFlags(q2npc::GetMonsterFlags(pTarget), q2::FL_NO_KNOCKBACK) )
+		flKnockback = 0.0;
+
+	//figure momentum add
+	if( !HasFlags(dflags, q2::DAMAGE_NO_KNOCKBACK) )
+	{
 		if( flKnockback > 0.0 and pTarget.pev.movetype != MOVETYPE_NONE and pTarget.pev.movetype != MOVETYPE_BOUNCE and pTarget.pev.movetype != MOVETYPE_PUSH/* and (pTarget.movetype != MOVETYPE_STOP)*/ )
 		{
 			Vector vecKvel;
 			float flMass = 200; //player
 
-			float flTargetMass = GetMassForTarget( pTarget, 200, 50, 2000 );
+			float flTargetMass = q2npc::GetMass( pTarget );
+			if( flTargetMass == 0 )
+				flTargetMass = GetMassForTarget( pTarget, 200, 50, 2000 );
+
 			if( flTargetMass < 50 )
 				flMass = 50;
 			else
 				flMass = flTargetMass;
 
+			//g_Game.AlertMessage( at_notice, "flMass %1\n", flMass );
 			if( pTarget.pev.FlagBitSet(FL_CLIENT) and pAttacker is pTarget )
-				vecKvel = vecDir * (1600.0 * flKnockback / flMass); //rocket jump hack
+				vecKvel = vecDir * (500.0 * flKnockback / flMass); //rocket jump hack (NOT NEEDED IN SVEN?!) //1600.0
 			else
 				vecKvel = vecDir * (500.0 * flKnockback / flMass);
 
@@ -167,14 +195,14 @@ void T_Damage( CBaseEntity@ pTarget, CBaseEntity@ pInflictor, CBaseEntity@ pAtta
 	flSave = 0.0;
 
 	// check for godmode
-	if( pTarget.pev.FlagBitSet(FL_GODMODE)/* and !(bitsDamageType & DAMAGE_NO_PROTECTION)*/ )
+	if( pTarget.pev.FlagBitSet(FL_GODMODE) and !HasFlags(dflags, q2::DAMAGE_NO_PROTECTION) )
 	{
 		flTake = 0.0;
 		flSave = flDamage;
-		//SpawnDamage (te_sparks, vecPoint, vecNormal, flSave);
+		SpawnDamage( te_sparks, vecPoint, vecNormal, flSave );
 	}
 
-	flPsave = CheckPowerArmor( pTarget, vecPoint, vecNormal, flTake, bitsDamageType );
+	flPsave = CheckPowerArmor( pTarget, vecPoint, vecNormal, flTake, dflags );
 	flTake -= flPsave;
 
 	flAsave = CheckArmor( pTarget, vecPoint, vecNormal, flTake );
@@ -186,16 +214,17 @@ void T_Damage( CBaseEntity@ pTarget, CBaseEntity@ pInflictor, CBaseEntity@ pAtta
 	//do the damage
 	if( flTake > 0.0 )
 	{
-		/*if( pTarget.pev.FlagBitSet(FL_MONSTER) or pTarget.pev.FlagBitSet(FL_CLIENT) )
-			SpawnDamage (TE_BLOOD, vecPoint, vecNormal, flTake);
+		if( pTarget.pev.FlagBitSet(FL_MONSTER|FL_CLIENT) )
+			SpawnDamage( q2::TE_BLOOD, vecPoint, vecNormal, flTake );
 		else
-			SpawnDamage (te_sparks, vecPoint, vecNormal, flTake);*/
+			SpawnDamage( te_sparks, vecPoint, vecNormal, flTake );
 
 		if( pTarget !is null )
 		{
-			CustomKeyvalues@ pCustom = pTarget.GetCustomKeyvalues();
-			pCustom.SetKeyvalue( KVN_MOD, mod );
-			//g_Game.AlertMessage( at_notice, "MODE OF DEATH SET TO %1\n", mod );
+			q2::SetMeansOfDeath( pTarget, iMeansOfDeath );
+			//CustomKeyvalues@ pCustom = pTarget.GetCustomKeyvalues();
+			//pCustom.SetKeyvalue( KVN_MOD, iMeansOfDeath );
+			//g_Game.AlertMessage( at_notice, "MEANS OF DEATH SET TO %1\n", iMeansOfDeath );
 		}
 
 		//this works with the custom death messages
@@ -205,7 +234,8 @@ void T_Damage( CBaseEntity@ pTarget, CBaseEntity@ pInflictor, CBaseEntity@ pAtta
 		else
 			@entAttacker = pAttacker.pev;
 
-		pTarget.TakeDamage( pInflictor.pev, entAttacker, flTake, bitsDamageType ); //bitsDamageType
+		pTarget.TakeDamage( pInflictor.pev, entAttacker, flTake, 0 );
+		//g_Game.AlertMessage( at_notice, "DAMAGE DEALT: %1\n", flTake );
 
 		//this doesn't
 		/*pTarget.pev.health = pTarget.pev.health - flTake;
@@ -234,17 +264,113 @@ void T_Damage( CBaseEntity@ pTarget, CBaseEntity@ pInflictor, CBaseEntity@ pAtta
 */
 }
 
-float GetMassForTarget( CBaseEntity@ pTarget, float flBaseScale, float flMinScale, float flMaxScale, float flScaleIncrease = 0.4, float flScaleDecrease = 1.5 )
+const array <int>splash_color = { 0, 93, 40, 159, 253, 93, 231 }; 
+//{ 0x00, 0xe0, 0xb0, 0x50, 0xd0, 0xe0, 0xe8 }
+//{ 0, 224, 176, 80, 208, 224, 232 }
+//(0, 0, 0), (156, 31, 1), (70, 71, 115), (20, 7, 1), (255, 255, 211), (156, 31, 1), (240, 0, 1)
+
+void SpawnDamage( int iType, Vector vecOrigin, Vector vecNormal, float flDamage )
+{
+	int iDamage = int( flDamage );
+	if( iDamage > 255 )
+		iDamage = 255;
+
+	switch( iType )
+	{
+		case q2::TE_BLOOD:	//bullet hitting flesh
+		{
+			//CL_ParticleEffect (pos, dir, 0xe8, 60);
+			//void CL_ParticleEffect (vec3_t org, vec3_t dir, int color, int count)
+			g_EngineFuncs.ParticleEffect( vecOrigin, vecNormal, 231, 60 ); //0xe8 (232) (240, 0, 1)
+			//g_WeaponFuncs.SpawnBlood( vecOrigin, BLOOD_COLOR_RED, iDamage ); //60
+			break;
+		}
+
+		case q2::TE_GUNSHOT:	// bullet hitting wall
+		case q2::TE_SPARKS:
+		case q2::TE_BULLET_SPARKS:
+		{
+			if( iType == q2::TE_GUNSHOT )
+				g_EngineFuncs.ParticleEffect( vecOrigin, vecNormal, 0, 40 ); //CL_ParticleEffect (vecOrigin, dir, 0, 40);
+			else
+				g_EngineFuncs.ParticleEffect( vecOrigin, vecNormal, 93, 6 ); //CL_ParticleEffect (vecOrigin, dir, 0xe0, 6); //0xe0 (224) (156, 31, 1)
+
+			if( iType != q2::TE_SPARKS )
+			{
+				//CL_SmokeAndFlash(vecOrigin);
+
+				// impact sound
+				int cnt = Math.RandomLong(0, 32767) & 15; //rand()&15;
+				if( cnt == 1 )
+					g_SoundSystem.PlaySound( null, CHAN_AUTO, "quake2/world/ric1.wav", VOL_NORM, ATTN_NORM, 0, PITCH_NORM, 0, true, vecOrigin );
+				else if( cnt == 2 )
+					g_SoundSystem.PlaySound( null, CHAN_AUTO, "quake2/world/ric2.wav", VOL_NORM, ATTN_NORM, 0, PITCH_NORM, 0, true, vecOrigin );
+				else if( cnt == 3 )
+					g_SoundSystem.PlaySound( null, CHAN_AUTO, "quake2/world/ric3.wav", VOL_NORM, ATTN_NORM, 0, PITCH_NORM, 0, true, vecOrigin );
+			}
+
+			break;
+		}
+
+		case q2::TE_SHOTGUN: // bullet hitting wall
+		{
+			//MSG_ReadPos (&net_message, pos);
+			//MSG_ReadDir (&net_message, dir);
+			g_EngineFuncs.ParticleEffect( vecOrigin, vecNormal, 0, 20 ); //CL_ParticleEffect (pos, dir, 0, 20);
+			//CL_SmokeAndFlash(pos);
+			break;
+		}
+
+		case q2::TE_SPLASH: // bullet hitting water
+		{
+			/*cnt = MSG_ReadByte (&net_message);
+			MSG_ReadPos (&net_message, pos);
+			MSG_ReadDir (&net_message, dir);
+			r = MSG_ReadByte (&net_message);*/
+
+			int color;
+			if( iDamage > 6 )
+				color = 0x00;
+			else
+				color = splash_color[ iDamage ];
+
+			g_EngineFuncs.ParticleEffect( vecOrigin, vecNormal, color, 8 ); //CL_ParticleEffect (pos, dir, color, cnt);
+
+			if( iDamage == 1 ) //SPLASH_SPARKS
+			{
+				int r = Math.RandomLong(0, 32767) & 3; //rand() & 3;
+
+				if( r == 0 )
+					g_SoundSystem.PlaySound( null, CHAN_AUTO, "quake2/world/spark5.wav", VOL_NORM, ATTN_STATIC, 0, PITCH_NORM, 0, true, vecOrigin );
+				else if( r == 1 )
+					g_SoundSystem.PlaySound( null, CHAN_AUTO, "quake2/world/spark6.wav", VOL_NORM, ATTN_STATIC, 0, PITCH_NORM, 0, true, vecOrigin );
+				else
+					g_SoundSystem.PlaySound( null, CHAN_AUTO, "quake2/world/spark7.wav", VOL_NORM, ATTN_STATIC, 0, PITCH_NORM, 0, true, vecOrigin );
+			}
+
+			break;
+		}
+	}
+
+	/*gi.WriteByte (svc_temp_entity);
+	gi.WriteByte (iType);
+//	gi.WriteByte (iDamage);
+	gi.WritePosition (origin);
+	gi.WriteDir (normal);
+	gi.multicast (origin, MULTICAST_PVS);*/
+}
+
+float GetMassForTarget( CBaseEntity@ pTarget, float flBaseMass, float flMinMass, float flMaxMass, float flMassIncrease = 0.4, float flMassDecrease = 1.5 )
 {
 	float flBaseMobVolume = 73728; //player size
-	float flScale;
+	float flMass;
 
 	float flMobVolume = (pTarget.pev.size.x * pTarget.pev.size.y * pTarget.pev.size.z);
-	if( flMobVolume > flBaseMobVolume ) flScale = (flBaseScale * (flMobVolume/flBaseMobVolume)) * flScaleIncrease;
-	else if( flMobVolume < flBaseMobVolume ) flScale = (flBaseScale / (flBaseMobVolume/flMobVolume)) * flScaleDecrease;
-	else flScale = flBaseScale;
+	if( flMobVolume > flBaseMobVolume ) flMass = (flBaseMass * (flMobVolume/flBaseMobVolume)) * flMassIncrease;
+	else if( flMobVolume < flBaseMobVolume ) flMass = (flBaseMass / (flBaseMobVolume/flMobVolume)) * flMassDecrease;
+	else flMass = flBaseMass;
 
-	return Math.clamp( flMinScale, flMaxScale, flScale );
+	return Math.clamp( flMinMass, flMaxMass, flMass );
 }
 
 //from quake 2 rerelease
@@ -257,7 +383,7 @@ bool CanDamage( CBaseEntity@ pTarget, CBaseEntity@ pInflictor )
 	Vector vecIinflictorCenter;
 
 	//if( pInflictor.linked )
-	if( pInflictor.pev.solid == SOLID_BSP )
+	if( pInflictor !is null and pInflictor.pev.solid == SOLID_BSP )
 		vecIinflictorCenter = (pInflictor.pev.absmin + pInflictor.pev.absmax) * 0.5;
 	else
 		vecIinflictorCenter = pInflictor.pev.origin;
@@ -318,8 +444,8 @@ bool CanDamage( CBaseEntity@ pTarget, CBaseEntity@ pInflictor )
 	return false;
 }
 
-//from quake 2
-float CheckPowerArmor( CBaseEntity@ pEnt, Vector vecPoint, Vector vecNormal, float flDamage, int bitsDamageType )
+//from quake 2 rerelease
+float CheckPowerArmor( CBaseEntity@ pEnt, Vector vecPoint, Vector vecNormal, float flDamage, int dflags )
 {
 	float flSave;
 	int iPowerArmorType;
@@ -332,6 +458,9 @@ float CheckPowerArmor( CBaseEntity@ pEnt, Vector vecPoint, Vector vecNormal, flo
 		return 0;
 
 	if( flDamage <= 0.0 )
+		return 0;
+
+	if( dflags & (q2::DAMAGE_NO_ARMOR | q2::DAMAGE_NO_POWER_ARMOR) != 0 )
 		return 0;
 
 	CBasePlayer@ pPlayer = cast<CBasePlayer@>(pEnt);
@@ -388,14 +517,14 @@ float CheckPowerArmor( CBaseEntity@ pEnt, Vector vecPoint, Vector vecNormal, flo
 		return 0.0;
 
 	//energy damage should do more to power armor, not ETF Rifle shots.
-	if( (bitsDamageType & DMG_ENERGYBEAM) != 0 )
+	if( (dflags & q2::DAMAGE_ENERGY) != 0 )
 		flSave = Math.max( 1.0, flSave / 2 );
 
 	if( flSave > flDamage )
 		flSave = flDamage;
 
-	// [Paril-KEX] energy damage should do more to power armor, not ETF Rifle shots.
-	if( (bitsDamageType & DMG_ENERGYBEAM) != 0 )
+	//energy damage should do more to power armor, not ETF Rifle shots.
+	if( (dflags & q2::DAMAGE_ENERGY) != 0 )
 		iPowerUsed = int( (flSave / iDamagePerCell) * 2 );
 	else
 		iPowerUsed = int( flSave / iDamagePerCell );
@@ -524,13 +653,9 @@ void G_CheckPowerArmor( CBaseEntity@ pEnt )
 }
 
 //from quake 2 rerelease
-Vector closest_point_to_box( const Vector &in from, const Vector &in absmins, const Vector &in absmaxs )
+Vector G_ProjectSource( const Vector &in point, const Vector &in distance, const Vector &in forward, const Vector &in right )
 {
-	return Vector(
-		(from.x < absmins.x) ? absmins.x : (from.x > absmaxs.x) ? absmaxs.x : from.x,
-		(from.y < absmins.y) ? absmins.y : (from.y > absmaxs.y) ? absmaxs.y : from.y,
-		(from.z < absmins.z) ? absmins.z : (from.z > absmaxs.z) ? absmaxs.z : from.z
-	);
+	return point + (forward * distance.x) + (right * distance.y) + Vector( 0.0, 0.0, distance.z );
 }
 
 void PM_UpdateStepSound( CBasePlayer@ pPlayer )
@@ -934,6 +1059,8 @@ void PM_PlayStepSound( CBasePlayer@ pPlayer, int iStep, float flVol )
 
 int MapTextureTypeStepType( char chTextureType )
 {
+	//g_Game.AlertMessage( at_notice, "chTextureType: %1\n", string(chTextureType) );
+
 	if( chTextureType == 'C' ) return STEP_CONCRETE;
 	else if( chTextureType == 'M' ) return STEP_METAL;
 	else if( chTextureType == 'D' ) return STEP_DIRT;
@@ -974,9 +1101,9 @@ void ThrowGib( CBaseEntity@ pEntity, int iCount, const string &in sGibName, floa
 			// since absmin is bloated by 1, un-bloat it here
 			Vector vecOrigin = (pEntity.pev.absmin + Vector(1.0, 1.0, 1.0)) + vecSize;
 
-			int i;
-
-			for( i = 0; i < 3; i++ )
+			//int i;
+			//for( i = 0; i < 3; i++ )
+			for( int j = 0; j < 3; j++ )
 			{
 				Vector vecRandom( crandom()*vecSize.x, crandom()*vecSize.y, crandom()*vecSize.z );
 				pGib.pev.origin = vecOrigin + vecRandom; //Vector(crandom(), crandom(), crandom()).scaled(vecSize);
@@ -999,6 +1126,7 @@ void ThrowGib( CBaseEntity@ pEntity, int iCount, const string &in sGibName, floa
 		{
 			//pGib.pev.movetype = MOVETYPE_BOUNCE;
 			vscale = 1.0;
+			pGib.m_material = matMetal;
 		}
 
 		if( (iType & GIB_DEBRIS) != 0 )
@@ -1078,7 +1206,8 @@ bool KillBox( CBaseEntity@ pEntity )
 			break;
 
 		// nail it
-		q2::T_Damage( g_EntityFuncs.Instance(tr.pHit), pEntity, pEntity, g_vecZero, pEntity.pev.origin, g_vecZero, 100000, 0, DMG_CRUSH | DMG_ALWAYSGIB ); //DAMAGE_NO_PROTECTION, MOD_TELEFRAG
+		q2::T_Damage( g_EntityFuncs.Instance(tr.pHit), pEntity, pEntity, g_vecZero, pEntity.pev.origin, g_vecZero, 100000, 0, 0, q2::MOD_TELEFRAG ); //DAMAGE_NO_PROTECTION, MOD_TELEFRAG
+		//q2::T_Damage( g_EntityFuncs.Instance(tr.pHit), pEntity, pEntity, g_vecZero, pEntity.pev.origin, g_vecZero, 100000, 0, DMG_CRUSH | DMG_ALWAYSGIB ); //DAMAGE_NO_PROTECTION, MOD_TELEFRAG
 		//g_EntityFuncs.Instance(tr.pHit).TakeDamage( pEntity.pev, pEntity.pev, 100000, DMG_CRUSH | DMG_ALWAYSGIB );
 
 		// if we didn't kill it, fail
@@ -1122,7 +1251,78 @@ void ClipGibVelocity( CBaseEntity@ ent )
 		ent.pev.velocity.z = 200; //always some upwards
 	else if( ent.pev.velocity.z > 500 )
 		ent.pev.velocity.z = 500;
-} 
+}
+
+//from quake 2
+//returns true if the entity is visible to self, even if not infront ()
+bool visible( CBaseEntity@ pSelf, CBaseEntity@ pOther )
+{
+	if( pOther is null )
+		return false;
+
+	TraceResult tr;
+
+	Vector spot1 = pSelf.EyePosition();
+	Vector spot2 = pOther.EyePosition();
+
+	g_Utility.TraceLine( spot1, spot2, ignore_monsters, ignore_glass, pSelf.edict(), tr );
+
+	//if( tr.fInOpen != 0 and tr.fInWater != 0 ) //replicating MASK_OPAQUE (CONTENTS_SOLID|CONTENTS_SLIME|CONTENTS_LAVA)
+		//return false;
+
+	if( tr.flFraction == 1.0 )
+		return true;
+
+	return false;
+}
+
+//from quake 2 rerelease
+//returns true if the entity is visible to self, even if not infront ()
+bool visible_rr( CBaseEntity@ pSelf, CBaseEntity@ pOther, bool bThroughGlass )
+{
+    // never visible
+    if( pOther.pev.FlagBitSet(FL_NOTARGET) )
+        return false;
+
+    // [Paril-KEX] bit of a hack, but we'll tweak monster-player visibility
+    // if they have the invisibility powerup.
+    if( pOther.pev.FlagBitSet(FL_CLIENT) )
+    {
+        // always visible in rtest
+        //if (pSelf->hackflags & HACKFLAG_ATTACK_PLAYER)
+            //return pSelf->inuse;
+
+        // fix intermission
+        if( pOther.pev.solid == SOLID_NOT )
+            return false;
+
+        //if (pOther->client->invisible_time > level.time)
+		if( pOther.pev.FlagBitSet(FL_NOTARGET) )
+        {
+            // can't see us at all after this time
+			CustomKeyvalues@ pCustom = pOther.GetCustomKeyvalues();
+            if( pCustom.GetKeyvalue(q2items::INVIS_KVN_FADETIME).GetFloat() <= g_Engine.time )
+                return false;
+
+            // otherwise, throw in some randomness
+            if( Math.RandomFloat(0.0, 1.0) * 255 > pOther.pev.renderamt )
+                return false;
+        }
+    }
+
+	TraceResult tr;
+
+	Vector spot1 = pSelf.EyePosition();
+	Vector spot2 = pOther.EyePosition();
+
+	g_Utility.TraceLine( spot1, spot2, ignore_monsters, bThroughGlass ? ignore_glass : dont_ignore_glass, pSelf.edict(), tr );
+
+	//if( tr.fInOpen != 0 and tr.fInWater != 0 ) //replicating MASK_OPAQUE (CONTENTS_SOLID|CONTENTS_SLIME|CONTENTS_LAVA)
+		//return false;
+
+    return tr.flFraction == 1.0 or g_EntityFuncs.Instance(tr.pHit) is pOther;
+}
+
 /*
 inline void G_AddBlend(float r, float g, float b, float a, std::array<float, 4> &v_blend)
 {
@@ -1199,4 +1399,250 @@ float crandom_open()
 	return std::uniform_real_distribution<float>(std::nextafterf(-1.f, 0.f), 1.f)(mt_rand);
 } 
 */
+
+/*
+=============
+range_to
+
+returns the distance of an entity relative to self.
+in general, the results determine how an AI reacts:
+melee	melee range, will become hostile even if back is turned
+near	visibility and infront, or visibility and show hostile
+mid	    infront and show hostile
+> mid	only triggered by damage
+=============
+*/
+//from quake 2 rerelease
+float range_to( CBaseEntity@ pSelf, CBaseEntity@ pOther )
+{
+    return distance_between_boxes( pSelf.pev.absmin, pSelf.pev.absmax, pOther.pev.absmin, pOther.pev.absmax );
+}
+
+//from quake 2 rerelease
+float distance_between_boxes( const Vector &in absminsa, const Vector &in absmaxsa, const Vector &in absminsb, const Vector &in absmaxsb )
+{
+    float len = 0;
+
+	for( size_t i = 0; i < 3; i++ )
+    {
+        if( absmaxsa[i] < absminsb[i] )
+        {
+            float d = absmaxsa[i] - absminsb[i];
+            len += d * d;
+        }
+        else if( absminsa[i] > absmaxsb[i] )
+        {
+            float d = absminsa[i] - absmaxsb[i];
+            len += d * d;
+        }
+    }
+
+    return sqrt( len );
+}
+
+//from quake 2 rerelease
+Vector closest_point_to_box( const Vector &in from, const Vector &in absmins, const Vector &in absmaxs )
+{
+	return Vector(
+		(from.x < absmins.x) ? absmins.x : (from.x > absmaxs.x) ? absmaxs.x : from.x,
+		(from.y < absmins.y) ? absmins.y : (from.y > absmaxs.y) ? absmaxs.y : from.y,
+		(from.z < absmins.z) ? absmins.z : (from.z > absmaxs.z) ? absmaxs.z : from.z
+	);
+}
+
+//from quake 2 rerelease, converted by ChatGPT
+enum stuck_result_t
+{
+	GOOD_POSITION,
+	FIXED,
+	NO_GOOD_POSITION
+};
+
+class StuckTrace
+{
+	bool startsolid;
+	Vector endpos;
+	Vector planeNormal;
+}
+
+funcdef StuckTrace@ TraceFn( const Vector &in start, const Vector &in mins, const Vector &in maxs, const Vector &in end );
+
+stuck_result_t G_FixStuckObject_Generic( const Vector &in vecOrigin, const Vector &in own_mins, const Vector &in own_maxs, TraceFn@ trace, Vector &out vecOut )
+{
+	StuckTrace@ tr = trace( vecOrigin, own_mins, own_maxs, vecOrigin );
+
+	if( !tr.startsolid )
+		return GOOD_POSITION;
+
+	array<Vector> good_origins;
+	array<float> distances;
+
+	array<array<int>> side_checks =
+	{
+		{0, 0, 1}, {0, 0, -1}, {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}
+	};
+
+	array<array<int>> side_mins =
+	{
+		{-1, -1, 0}, {-1, -1, 0}, {0, -1, -1}, {0, -1, -1}, {-1, 0, -1}, {-1, 0, -1}
+	};
+
+	array<array<int>> side_maxs =
+	{
+		{1, 1, 0}, {1, 1, 0}, {0, 1, 1}, {0, 1, 1}, {1, 0, 1}, {1, 0, 1}
+	};
+
+	for( uint sn = 0; sn < side_checks.length(); ++sn )
+	{
+		Vector start = vecOrigin;
+		Vector mins, maxs;
+
+		for (uint i = 0; i < 3; ++i)
+		{
+			if( side_checks[sn][i] < 0 )
+				start[i] += own_mins[i];
+			else if( side_checks[sn][i] > 0 )
+				start[i] += own_maxs[i];
+
+			mins[i] = (side_mins[sn][i] == -1) ? own_mins[i] : (side_mins[sn][i] == 1) ? own_maxs[i] : 0;
+			maxs[i] = (side_maxs[sn][i] == -1) ? own_mins[i] : (side_maxs[sn][i] == 1) ? own_maxs[i] : 0;
+		}
+
+		StuckTrace@ side_trace = trace( start, mins, maxs, start );
+		int fix_axis = -1;
+		int fix_dir = 0;
+
+		if( side_trace.startsolid )
+		{
+			for( uint e = 0; e < 3; ++e )
+			{
+				if( side_checks[sn][e] != 0 )
+					continue;
+
+				Vector ep = start;
+				ep[e] += 1;
+				StuckTrace@ tr1 = trace( ep, mins, maxs, ep );
+				if( !tr1.startsolid )
+				{
+					start = ep;
+					fix_axis = e;
+					fix_dir = 1;
+					break;
+				}
+
+				ep[e] -= 2;
+				StuckTrace@ tr2 = trace( ep, mins, maxs, ep );
+				if( !tr2.startsolid )
+				{
+					start = ep;
+					fix_axis = e;
+					fix_dir = -1;
+					break;
+				}
+			}
+		}
+
+		if( trace(start, mins, maxs, start).startsolid )
+			continue;
+
+		Vector opposite = vecOrigin;
+		uint opp = sn ^ 1;
+
+		for( uint i = 0; i < 3; ++i )
+		{
+			if( side_checks[opp][i] < 0 ) opposite[i] += own_mins[i];
+			else if( side_checks[opp][i] > 0 ) opposite[i] += own_maxs[i];
+		}
+
+		if( fix_axis >= 0 ) opposite[fix_axis] += fix_dir;
+
+		StuckTrace@ final_trace = trace( start, mins, maxs, opposite );
+		if( final_trace.startsolid ) continue;
+
+		Vector end = final_trace.endpos + Vector(side_checks[sn][0], side_checks[sn][1], side_checks[sn][2]) * 0.125f;
+		Vector delta = end - opposite;
+		Vector new_origin = vecOrigin + delta;
+
+		if( fix_axis >= 0 ) new_origin[fix_axis] += fix_dir;
+
+		if( !trace(new_origin, own_mins, own_maxs, new_origin).startsolid )
+		{
+			good_origins.insertLast( new_origin );
+			distances.insertLast( delta.Length() ); //LengthSquared
+		}
+	}
+
+	if( good_origins.length() > 0 )
+	{
+		int best = 0;
+		float best_dist = distances[0];
+
+		for( uint i = 1; i < distances.length(); ++i )
+		{
+			if( distances[i] < best_dist )
+			{
+				best = i;
+				best_dist = distances[i];
+			}
+		}
+
+		vecOut = good_origins[best];
+		return FIXED;
+	}
+
+	return NO_GOOD_POSITION;
+}
+
+//from ChatGPT
+HULL_NUMBER GetClosestHullNumber( const Vector &in mins, const Vector &in maxs )
+{
+	Vector size = maxs - mins;
+
+	// Define known hull dimensions (approximate from SC engine)
+	// Format: { hull type, size }
+	const array<dictionary> hullSizes =
+	{
+		{ {"type", 0},	{"size", Vector(0, 0, 0)} },
+		{ {"type", 1},	{"size", Vector(32, 32, 72)} },
+		{ {"type", 2},	{"size", Vector(64, 64, 64)} },
+		{ {"type", 3},	{"size", Vector(32, 32, 36)} }
+		/*{ {"type", point_hull},	{"size", Vector(0, 0, 0)} },
+		{ {"type", human_hull},	{"size", Vector(32, 32, 72)} },
+		{ {"type", large_hull},	{"size", Vector(64, 64, 64)} },
+		{ {"type", head_hull},	{"size", Vector(32, 32, 36)} }*/
+	};
+
+	const array<HULL_NUMBER> hulls =
+	{
+		point_hull,
+		human_hull,
+		large_hull,
+		head_hull
+	};
+
+	HULL_NUMBER bestHull = human_hull;
+	float bestDiff = 1e6;
+
+	for( uint i = 0; i < hullSizes.length(); ++i )
+	{
+		Vector refSize;
+		hullSizes[i].get( "size", refSize );
+
+		// Difference in bounding box size
+		//float diff = ( refSize - size.Abs() ).Length();
+		float diff = ( refSize - size ).Length();
+
+		if( diff < bestDiff )
+		{
+			bestDiff = diff;
+			uint uiHullNum;
+			hullSizes[i].get( "type", uiHullNum );
+			bestHull = hulls[ uiHullNum ];
+		}
+	}
+
+	//g_Game.AlertMessage( at_notice, "bestHull: %1!\n", int(bestHull) );
+	return bestHull;
+}
+
 } //end of namespace q2

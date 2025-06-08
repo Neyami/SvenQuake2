@@ -216,12 +216,14 @@ class weapon_q2chaingun : CBaseQ2Weapon
 		Vector vecMuzzle = m_pPlayer.GetGunPosition();
 		Vector vecAim = g_Engine.v_forward;
 
+		float flKick = 2;
 		float flDamage = Q2W_DAMAGE;
 		if( self.m_flCustomDmg > 0 )
 			flDamage = self.m_flCustomDmg;
 
 		if( CheckQuadDamage() )
 		{
+			flKick *= 4;
 			flDamage *= 4;
 			g_SoundSystem.EmitSoundDyn( m_pPlayer.edict(), CHAN_ITEM, pQ2WSounds[SND_QUAD_FIRE], GetSilencedVolume(VOL_NORM), ATTN_NORM );
 		}
@@ -235,7 +237,14 @@ class weapon_q2chaingun : CBaseQ2Weapon
 		}
 
 		muzzleflash( vecMuzzle, 255, 255, 0, 2 );
-		fire_bullet( vecMuzzle, vecAim, flDamage );
+
+		if( !m_bUseQ2Bullets )
+			fire_bullet( vecMuzzle, vecAim, flDamage );
+		else
+		{
+			vecAim.z = -vecAim.z;
+			q2::fire_bullet( m_pPlayer, vecMuzzle, vecAim, flDamage, flKick, q2::DEFAULT_BULLET_HSPREAD, q2::DEFAULT_BULLET_VSPREAD, q2::MOD_CHAINGUN );
+		}
 
 		CheckSilencer();
 

@@ -1,6 +1,7 @@
 class CBaseQ2Weapon : ScriptBasePlayerWeaponEntity
 {
 	bool m_bRerelease = true;
+	bool m_bUseQ2Bullets = true;
 	float m_iAmmoWarning;
 
 	protected CBasePlayer@ m_pPlayer
@@ -41,6 +42,12 @@ class CBaseQ2Weapon : ScriptBasePlayerWeaponEntity
 		CustomKeyvalues@ pCustom = m_pPlayer.GetCustomKeyvalues();
 
 		int iSilencerShots = pCustom.GetKeyvalue(q2items::SILENCER_KVN).GetInteger();
+
+		if( iSilencerShots > 0 )
+			pCustom.SetKeyvalue( q2items::INVIS_KVN_FADETIME, g_Engine.time + (q2items::INVISIBILITY_TIME / 5) );
+		else
+			pCustom.SetKeyvalue( q2items::INVIS_KVN_FADETIME, g_Engine.time + q2items::INVISIBILITY_TIME );
+
 		if( iSilencerShots > 0 )
 		{
 			iSilencerShots--;
@@ -97,7 +104,7 @@ class CBaseQ2Weapon : ScriptBasePlayerWeaponEntity
 		//if (item->flags & IF_NO_INFINITE_AMMO)
 			//return false;
 
-		return q2weapons::cvar_InfiniteAmmo.GetInt() == 1/* or (q2::PVP and g_instagib->integer)*/;
+		return q2::cvar_InfiniteAmmo.GetInt() == 1/* or (q2::PVP and g_instagib->integer)*/;
 	}
 
 	void muzzleflash( Vector vecOrigin, int iR, int iG, int iB, int iRadius = 20 )
@@ -133,12 +140,15 @@ class CBaseQ2Weapon : ScriptBasePlayerWeaponEntity
 	void fire_blaster( Vector vecStart, Vector vecDir, float flDamage, float flSpeed, bool bHyper = false )
 	{
 		CBaseEntity@ pLaser = g_EntityFuncs.Create( "q2laser", vecStart, vecDir, false, m_pPlayer.edict() ); 
+
+		pLaser.pev.netname = m_pPlayer.pev.netname;
+		pLaser.pev.speed = flSpeed;
 		pLaser.pev.velocity = vecDir * flSpeed;
 		pLaser.pev.dmg = flDamage;
 		pLaser.pev.angles = Math.VecToAngles( vecDir.Normalize() );
 
 		if( bHyper )
-			pLaser.pev.weapons = 1;
+			pLaser.pev.weapons = q2::MOD_HYPERBLASTER;
 	}
 
 	void fire_grenade( Vector vecStart, Vector vecAim, float flDamage, float flSpeed, float flDamageRadius )
@@ -146,6 +156,7 @@ class CBaseQ2Weapon : ScriptBasePlayerWeaponEntity
 		CBaseEntity@ cbeGrenade = g_EntityFuncs.Create( "q2grenade", vecStart, g_vecZero, true, m_pPlayer.edict() );
 		q2projectiles::q2grenade@ pGrenade = cast<q2projectiles::q2grenade@>(CastToScriptClass(cbeGrenade));
 
+		pGrenade.pev.netname = m_pPlayer.pev.netname;
 		pGrenade.pev.dmg = flDamage;
 		pGrenade.pev.velocity = vecAim * flSpeed;
 		pGrenade.pev.dmgtime = 2.5;
@@ -162,6 +173,7 @@ class CBaseQ2Weapon : ScriptBasePlayerWeaponEntity
 		CBaseEntity@ cbeGrenade = g_EntityFuncs.Create( "q2grenade", vecStart, g_vecZero, true, m_pPlayer.edict() );
 		q2projectiles::q2grenade@ pGrenade = cast<q2projectiles::q2grenade@>(CastToScriptClass(cbeGrenade));
 
+		pGrenade.pev.netname = m_pPlayer.pev.netname;
 		pGrenade.pev.dmg = flDamage;
 		pGrenade.pev.velocity = vecVelocity;
 		pGrenade.pev.weapons = 1;
@@ -173,14 +185,22 @@ class CBaseQ2Weapon : ScriptBasePlayerWeaponEntity
 
 	void fire_rocket( Vector vecStart, Vector vecDir, float flDamage, float flSpeed )
 	{
-		CBaseEntity@ pRocket = g_EntityFuncs.Create( "q2rocket", vecStart, vecDir, false, m_pPlayer.edict() ); 
+		CBaseEntity@ cbeRocket = g_EntityFuncs.Create( "q2rocket", vecStart, vecDir, true, m_pPlayer.edict() ); 
+		q2projectiles::q2rocket@ pRocket = cast<q2projectiles::q2rocket@>(CastToScriptClass(cbeRocket));
+
+		pRocket.pev.netname = m_pPlayer.pev.netname;
+		pRocket.pev.speed = flSpeed;
 		pRocket.pev.velocity = vecDir * flSpeed;
 		pRocket.pev.dmg = flDamage;
+		pRocket.m_flDamageRadius = flDamage + 20;
+		pRocket.m_flRadiusDamage = flDamage;
 		pRocket.pev.angles = Math.VecToAngles( vecDir.Normalize() );
 		pRocket.pev.scale = m_pPlayer.pev.scale;
+
+		g_EntityFuncs.DispatchSpawn( pRocket.self.edict() );
 	}
 
-	void fire_railgun( Vector vecStart, Vector vecAim, float flDamage )
+	void fire_railgun( Vector vecStart, Vector vecAim, float flDamage, float flKick = 0.0 )
 	{
 		TraceResult tr;
 
@@ -201,11 +221,7 @@ class CBaseQ2Weapon : ScriptBasePlayerWeaponEntity
 				@ignore = null;
 
 			if( tr.pHit !is self.edict() and pHit.pev.takedamage != DAMAGE_NO )
-			{
-				g_WeaponFuncs.ClearMultiDamage();
-				pHit.TraceAttack( m_pPlayer.pev, flDamage, vecEnd, tr, DMG_ENERGYBEAM | DMG_LAUNCH ); 
-				g_WeaponFuncs.ApplyMultiDamage( self.pev, m_pPlayer.pev );
-			}
+				q2::T_Damage( pHit, m_pPlayer, m_pPlayer, vecAim, tr.vecEndPos, tr.vecPlaneNormal, flDamage, flKick, 0, q2::MOD_RAILGUN );
 
 			vecStart = tr.vecEndPos;
 		}
@@ -249,10 +265,15 @@ class CBaseQ2Weapon : ScriptBasePlayerWeaponEntity
 
 	void fire_bfg( Vector vecStart, Vector vecDir, float flDamage, float flSpeed, float flDamageRadius )
 	{
-		CBaseEntity@ pBFG = g_EntityFuncs.Create( "q2bfg", vecStart, vecDir, false, m_pPlayer.edict() );
+		CBaseEntity@ pBFG = g_EntityFuncs.Create( "q2bfg", vecStart, vecDir, true, m_pPlayer.edict() );
+
+		pBFG.pev.netname = m_pPlayer.pev.netname;
+		pBFG.pev.speed = flSpeed;
 		pBFG.pev.velocity = vecDir * flSpeed;
 		pBFG.pev.dmg = flDamage;
 		pBFG.pev.dmgtime = flDamageRadius;
+
+		g_EntityFuncs.DispatchSpawn( pBFG.edict() );
 	}
 
 	//CBaseEntity@ CheckTraceHullAttack( float flDist, float flDamage, int iDmgType )
@@ -272,10 +293,11 @@ class CBaseQ2Weapon : ScriptBasePlayerWeaponEntity
 		if( tr.pHit !is null )
 		{
 			CBaseEntity@ pHit = g_EntityFuncs.Instance( tr.pHit );
+			if( q2::IsAlly(m_pPlayer, pHit) ) return false;
 
 			//pHit.TakeDamage( self.pev, self.pev, flDamage, DMG_SLASH );
 			Vector closest_point_to_check = q2::closest_point_to_box( vecStart, pHit.pev.origin + pHit.pev.mins, pHit.pev.origin + pHit.pev.maxs );
-			q2::T_Damage( pHit, self, self, g_Engine.v_forward, closest_point_to_check, -g_Engine.v_forward, flDamage, kick / 2, 0 ); //DAMAGE_DESTROY_ARMOR | DAMAGE_NO_KNOCKBACK
+			q2::T_Damage( pHit, self, self, g_Engine.v_forward, closest_point_to_check, -g_Engine.v_forward, flDamage, kick / 2, q2::DAMAGE_DESTROY_ARMOR | q2::DAMAGE_NO_KNOCKBACK, q2::MOD_UNKNOWN );
 
 			return true;
 		}

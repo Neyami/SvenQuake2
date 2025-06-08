@@ -294,7 +294,7 @@ class weapon_q2plasmabeam : CBaseQ2Weapon
 					CBaseEntity@ pHit = g_EntityFuncs.Instance( tr.pHit );
 
 					if( pHit.pev.takedamage != DAMAGE_NO )
-						q2::T_Damage( pHit, m_pPlayer, m_pPlayer, vecAimdir, tr.vecEndPos, tr.vecPlaneNormal, flDamage, iKick, DMG_ENERGYBEAM );
+						q2::T_Damage( pHit, m_pPlayer, m_pPlayer, vecAimdir, tr.vecEndPos, tr.vecPlaneNormal, flDamage, iKick, q2::DAMAGE_ENERGY, q2::MOD_HEATBEAM );
 					else
 					{
 						if( !bWater )

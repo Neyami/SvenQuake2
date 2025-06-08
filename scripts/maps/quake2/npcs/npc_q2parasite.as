@@ -12,7 +12,9 @@ const string MODEL_GIB_HEAD		= "models/quake2/monsters/parasite/gibs/head.mdl";
 const string SPRITE_TONGUE			= "sprites/tongue.spr";
 
 const Vector NPC_MINS					= Vector( -16, -16, 0 );
-const Vector NPC_MAXS					= Vector( 16, 16, 42 ); //48 in quake 2
+const Vector NPC_MAXS					= Vector( 16, 16, 48 ); //42 in svencoop
+const Vector NPC_MINS_DEAD		= Vector( -16, -16, 0 );
+const Vector NPC_MAXS_DEAD		= Vector( 16, 16, 8 );
 
 const int NPC_HEALTH					= 175;
 
@@ -140,7 +142,7 @@ final class npc_q2parasite : CBaseQ2NPC
 		return CLASS_ALIEN_MILITARY; //??
 	}
 
-	void MonsterAlertSound()
+	void MonsterSight()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_SIGHT], VOL_NORM, ATTN_NORM );
 	}
@@ -193,7 +195,7 @@ final class npc_q2parasite : CBaseQ2NPC
 		}
 	}
 
-	void RunTask( Task@ pTask )
+	void MonsterRunTask( Task@ pTask )
 	{
 		switch( pTask.iTask )
 		{
@@ -238,13 +240,13 @@ final class npc_q2parasite : CBaseQ2NPC
 		return BaseClass.GetScheduleOfType( iType );
 	}
 
-	void HandleAnimEventQ2( MonsterEvent@ pEvent )
+	void MonsterHandleAnimEvent( MonsterEvent@ pEvent )
 	{
 		switch( pEvent.event )
 		{
 			case AE_IDLETAP:
 			{
-				if( !HasFlags(m_iSpawnFlags, q2npc::SPAWNFLAG_MONSTER_AMBUSH) )
+				if( !HasFlags(m_iSpawnFlags, q2::SPAWNFLAG_MONSTER_AMBUSH) )
 					g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_TAP], 0.75, 2.75 );
 
 				break;
@@ -348,9 +350,8 @@ final class npc_q2parasite : CBaseQ2NPC
 		UpdateEffect();
 
 		vecDir = ( vecEnd - vecStart );
-		g_WeaponFuncs.ClearMultiDamage();
-		self.m_hEnemy.GetEntity().TraceAttack( self.pev, flDamage, vecDir, tr, DMG_GENERIC );
-		g_WeaponFuncs.ApplyMultiDamage( self.pev, self.pev );
+		//T_Damage (self->enemy, self, self, dir, self->enemy->s.origin, vec3_origin, damage, 0, DAMAGE_NO_KNOCKBACK, MOD_UNKNOWN);
+		q2::T_Damage( self.m_hEnemy.GetEntity(), self, self, vecDir, self.m_hEnemy.GetEntity().pev.origin, g_vecZero, flDamage, 0, q2::DAMAGE_NO_KNOCKBACK, q2::MOD_HIT );
 	}
 
 	//from halflife-op4-updated-master
@@ -390,10 +391,7 @@ final class npc_q2parasite : CBaseQ2NPC
 		float psave = CheckPowerArmor( pevInflictor, flDamage );
 		flDamage -= psave;
 
-		if( pev.health < (pev.max_health / 2) )
-			pev.skin |= 1;
-		else
-			pev.skin &= ~1;
+		SetSkin();
 
 		if( pevAttacker !is self.pev )
 			pevAttacker.frags += ( flDamage/90 );
@@ -405,7 +403,18 @@ final class npc_q2parasite : CBaseQ2NPC
 
 		M_ReactToDamage( g_EntityFuncs.Instance(pevAttacker) );
 
-		return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
+		if( pev.deadflag == DEAD_NO )
+			return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
+		else
+			return DeadTakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
+	}
+
+	void MonsterSetSkin()
+	{
+		if( pev.health < (pev.max_health / 2) )
+			pev.skin = 1;
+		else
+			pev.skin = 0;
 	}
 
 	void HandlePain( float flDamage )
@@ -433,7 +442,37 @@ final class npc_q2parasite : CBaseQ2NPC
 		DestroyEffect();
 	}
 
-	void GibMonster()
+	//nameOfMonster_dead
+	void MonsterDead()
+	{
+		if( m_bRerelease )
+		{
+			g_EntityFuncs.SetSize( self.pev, NPC_MINS_DEAD, NPC_MAXS_DEAD );
+			monster_dead();
+		}
+		else
+		{
+			g_EntityFuncs.SetSize( self.pev, NPC_MINS_DEAD, NPC_MAXS_DEAD );
+			pev.movetype = MOVETYPE_TOSS;
+			//self->svflags |= SVF_DEADMONSTER;
+			pev.nextthink = 0;
+			g_EntityFuncs.SetOrigin( self, pev.origin ); //gi.linkentity (self);
+		}
+	}
+
+	//FUCKING ERROR: CustomEntityCallbackHandler::SetThinkFunction: function must be a delegate of the owning object type! BULLSHIT
+	void monster_dead()
+	{
+		SetThink( ThinkFunction(this.monster_dead_think) );
+		monster_dead_base();
+	}
+
+	void monster_dead_think()
+	{
+		monster_dead_think_base();
+	}
+
+	void MonsterGib()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_DEATH_GIB], VOL_NORM, ATTN_NORM );
 
@@ -445,22 +484,6 @@ final class npc_q2parasite : CBaseQ2NPC
 		q2::ThrowGib( self, 1, MODEL_GIB_FLEG, pev.dmg, 14, BREAK_FLESH );
 		q2::ThrowGib( self, 1, MODEL_GIB_FLEG, pev.dmg, 17, BREAK_FLESH );
 		q2::ThrowGib( self, 1, MODEL_GIB_HEAD, pev.dmg, 4, BREAK_FLESH );
-
-		SetThink( ThinkFunction(this.SUB_Remove) );
-		pev.nextthink = g_Engine.time;
-	}
- 
-	void SUB_Remove()
-	{
-		self.UpdateOnRemove();
-
-		if( pev.health > 0 )
-		{
-			// this situation can screw up monsters who can't tell their entity pointers are invalid.
-			pev.health = 0;
-		}
-
-		g_EntityFuncs.Remove(self);
 	}
 }
 

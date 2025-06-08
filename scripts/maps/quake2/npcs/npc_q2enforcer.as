@@ -11,7 +11,9 @@ const string MODEL_GIB_GUN			= "models/quake2/monsters/enforcer/gibs/gun.mdl";
 const string MODEL_GIB_HEAD		= "models/quake2/monsters/enforcer/gibs/head.mdl";
 
 const Vector NPC_MINS					= Vector( -16, -16, 0 );
-const Vector NPC_MAXS					= Vector( 16, 16, 80 );
+const Vector NPC_MAXS					= Vector( 16, 16, 56 ); //80 in svencoop
+const Vector NPC_MINS_DEAD		= Vector( -16, -16, 0 );
+const Vector NPC_MAXS_DEAD		= Vector( 16, 16, 8 );
 
 const int NPC_HEALTH					= 100;
 
@@ -19,6 +21,7 @@ const int AE_MELEEATTACK				= 11;
 const int AE_DECAPITATE				= 12;
 const int AE_DEATHSHOT				= 13;
 const int AE_SHOOTGUN					= 14;
+const int AE_MELEESWING				= 15;
 
 const float GUN_DAMAGE				= 3.0;
 const Vector GUN_SPREAD				= VECTOR_CONE_3DEGREES;
@@ -41,7 +44,8 @@ const array<string> arrsNPCSounds =
 	"quake2/npcs/enforcer/infpain1.wav",
 	"quake2/npcs/enforcer/infpain2.wav",
 	"quake2/npcs/enforcer/infdeth1.wav",
-	"quake2/npcs/enforcer/infdeth2.wav"
+	"quake2/npcs/enforcer/infdeth2.wav",
+	"quake2/npcs/enforcer/inflies1.wav"
 };
 
 enum q2sounds_e
@@ -54,7 +58,8 @@ enum q2sounds_e
 	SND_MELEE,
 	SND_MELEE_HIT,
 	SND_PAIN1,
-	SND_PAIN2
+	SND_PAIN2,
+	SND_FLIES
 };
 
 final class npc_q2enforcer : CBaseQ2NPC
@@ -82,6 +87,7 @@ final class npc_q2enforcer : CBaseQ2NPC
 
 		m_flGibHealth = -65.0;
 		SetMass( 200 );
+		monsterinfo.aiflags |= q2::AI_STINKY;
 
 		@this.m_Schedules = @enforcer_schedules;
 
@@ -119,12 +125,12 @@ final class npc_q2enforcer : CBaseQ2NPC
 		return CLASS_ALIEN_MILITARY;
 	}
 
-	void MonsterAlertSound()
+	void MonsterSight()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_SIGHT], VOL_NORM, ATTN_NORM );
 	}
 
-	void SearchSound()
+	void MonsterSearch()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_SEARCH], VOL_NORM, ATTN_NORM );
 	}
@@ -138,31 +144,19 @@ final class npc_q2enforcer : CBaseQ2NPC
 		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_IDLE], VOL_NORM, ATTN_IDLE );
 	}
 
-	void HandleAnimEventQ2( MonsterEvent@ pEvent )
+	void MonsterHandleAnimEvent( MonsterEvent@ pEvent )
 	{
 		switch( pEvent.event )
 		{
+			case AE_MELEESWING:
+			{
+				infantry_swing();
+				break;
+			}
+
 			case AE_MELEEATTACK:
 			{
-				int iDamage = Math.RandomLong( MELEE_DMG_MIN, MELEE_DMG_MAX );
-
-				CBaseEntity@ pHurt = CheckTraceHullAttack( Q2_MELEE_DISTANCE, iDamage, DMG_GENERIC );
-				if( pHurt !is null )
-				{
-					if( pHurt.pev.FlagBitSet(FL_MONSTER) or pHurt.pev.FlagBitSet(FL_CLIENT) and pHurt.pev.size.z <= 88.0 )
-					{
-						pHurt.pev.punchangle.x = 5;
-						Math.MakeVectors( pev.angles );
-
-						pHurt.pev.velocity = pHurt.pev.velocity + g_Engine.v_forward * MELEE_KICK;
-					}
-
-					g_SoundSystem.EmitSound( self.edict(), CHAN_BODY, arrsNPCSounds[SND_MELEE_HIT], VOL_NORM, ATTN_NORM );
-					GetSoundEntInstance().InsertSound( bits_SOUND_COMBAT, pev.origin, 92, 0.3, self );
-				}
-				else
-					m_flMeleeCooldown = g_Engine.time + MELEE_CD;
-
+				infantry_smack();
 				break;
 			}
 
@@ -212,6 +206,31 @@ final class npc_q2enforcer : CBaseQ2NPC
 		}
 	}
 
+	void infantry_swing()
+	{
+		g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_MELEE], VOL_NORM, ATTN_NORM );
+	}
+
+	void infantry_smack()
+	{
+		if( m_bRerelease )
+		{
+			Vector aim = Vector( Q2_MELEE_DISTANCE_RR, 0, 0 );
+
+			if( fire_hit(aim, Math.RandomFloat(5.0, 10.0), 50) )
+				g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_MELEE_HIT], VOL_NORM, ATTN_NORM );
+			else
+				monsterinfo.melee_debounce_time = g_Engine.time + 1.5;
+		}
+		else
+		{
+			Vector aim = Vector( Q2_MELEE_DISTANCE, 0, 0 );
+
+			if( fire_hit(aim, 5 + Math.RandomFloat(0.0, 5.0), 50) ) //(5 + (rand() % 5))
+				g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_MELEE_HIT], VOL_NORM, ATTN_NORM );
+		}
+	}
+
 	bool CheckRangeAttack1( float flDot, float flDist )
 	{
 		if( M_CheckAttack(flDist) )
@@ -224,15 +243,33 @@ final class npc_q2enforcer : CBaseQ2NPC
 		return false;
 	}
 
-	bool CheckMeleeAttack1( float flDot, float flDist )
+	void M_FliesOff()
 	{
-		if( g_Engine.time < m_flMeleeCooldown )
-			return false;
+		m_iEffects &= ~q2::EF_FLIES;
+		g_SoundSystem.StopSound( self.edict(), CHAN_BODY, arrsNPCSounds[SND_FLIES] );
+	}
 
-		if( flDist <= 64 and flDot >= 0.7 and self.m_hEnemy.IsValid() and self.m_hEnemy.GetEntity().pev.FlagBitSet(FL_ONGROUND) )
-			return true;
+	void M_FliesOn()
+	{
+		if( pev.waterlevel > WATERLEVEL_DRY )
+			return;
 
-		return false;
+		m_iEffects |= q2::EF_FLIES;
+		g_SoundSystem.EmitSoundDyn( self.edict(), CHAN_BODY, arrsNPCSounds[SND_FLIES], VOL_NORM, ATTN_NORM, SND_FORCE_LOOP );
+		SetThink( ThinkFunction(this.M_FliesOff) );
+		pev.nextthink = g_Engine.time + 60.0;
+	}
+
+	void M_FlyCheck()
+	{
+		if( pev.waterlevel > WATERLEVEL_DRY )
+			return;
+
+		//if( Math.RandomFloat(0.0, 1.0) > 0.5 )
+			//return;
+
+		SetThink( ThinkFunction(this.M_FliesOn) );
+		pev.nextthink = g_Engine.time + 5 + 10 * Math.RandomLong( 0, 1 );
 	}
 
 	int TakeDamage( entvars_t@ pevInflictor, entvars_t@ pevAttacker, float flDamage, int bitsDamageType )
@@ -240,10 +277,7 @@ final class npc_q2enforcer : CBaseQ2NPC
 		float psave = CheckPowerArmor( pevInflictor, flDamage );
 		flDamage -= psave;
 
-		if( pev.health < (pev.max_health / 2) )
-			pev.skin |= 1;
-		else
-			pev.skin &= ~1;
+		SetSkin();
 
 		if( pevAttacker !is self.pev )
 			pevAttacker.frags += ( flDamage/90 );
@@ -255,7 +289,18 @@ final class npc_q2enforcer : CBaseQ2NPC
 
 		M_ReactToDamage( g_EntityFuncs.Instance(pevAttacker) );
 
-		return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
+		if( pev.deadflag == DEAD_NO )
+			return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
+		else
+			return DeadTakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
+	}
+
+	void MonsterSetSkin()
+	{
+		if( pev.health < (pev.max_health / 2) )
+			pev.skin = 1;
+		else
+			pev.skin = 0;
 	}
 
 	void HandlePain( float flDamage )
@@ -281,8 +326,40 @@ final class npc_q2enforcer : CBaseQ2NPC
 			self.ChangeSchedule( slQ2Pain2 );
 	}
 
-	void GibMonster()
+	//nameOfMonster_dead
+	void MonsterDead()
 	{
+		if( m_bRerelease )
+		{
+			g_EntityFuncs.SetSize( self.pev, NPC_MINS_DEAD, NPC_MAXS_DEAD );
+			monster_dead();
+		}
+		else
+		{
+			g_EntityFuncs.SetSize( self.pev, NPC_MINS_DEAD, NPC_MAXS_DEAD );
+			pev.movetype = MOVETYPE_TOSS;
+			//self->svflags |= SVF_DEADMONSTER;
+			g_EntityFuncs.SetOrigin( self, pev.origin ); //gi.linkentity (self);
+
+			M_FlyCheck();
+		}
+	}
+
+	//FUCKING ERROR: CustomEntityCallbackHandler::SetThinkFunction: function must be a delegate of the owning object type! BULLSHIT
+	void monster_dead()
+	{
+		SetThink( ThinkFunction(this.monster_dead_think) );
+		monster_dead_base();
+	}
+
+	void monster_dead_think()
+	{
+		monster_dead_think_base();
+	}
+
+	void MonsterGib()
+	{
+		M_FliesOff();
 		g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_DEATH_GIB], VOL_NORM, ATTN_NORM );
 
 		q2::ThrowGib( self, 1, MODEL_GIB_BONE, pev.dmg, -1, BREAK_FLESH );
@@ -294,11 +371,8 @@ final class npc_q2enforcer : CBaseQ2NPC
 		q2::ThrowGib( self, 1, MODEL_GIB_ARM, pev.dmg, 8, BREAK_FLESH );
 		q2::ThrowGib( self, 1, MODEL_GIB_ARM, pev.dmg, 12, BREAK_FLESH );
 		q2::ThrowGib( self, 1, MODEL_GIB_HEAD, pev.dmg, 6, BREAK_FLESH );
-
-		SetThink( ThinkFunction(this.SUB_Remove) );
-		pev.nextthink = g_Engine.time;
 	}
- 
+
 	void infantry_fire()
 	{
 		if( m_flStopShooting <= 0.0 )
@@ -335,17 +409,13 @@ final class npc_q2enforcer : CBaseQ2NPC
 
 		MachineGunEffects( vecMuzzle, 3 );
 
-		monster_fire_weapon( q2npc::WEAPON_BULLET, vecMuzzle, vecAim, GUN_DAMAGE );
+		monster_fire_weapon( q2::WEAPON_BULLET, vecMuzzle, vecAim, GUN_DAMAGE );
 	}
 
-	void SUB_Remove()
+	void UpdateOnRemove()
 	{
-		self.UpdateOnRemove();
-
-		if( pev.health > 0 )
-			pev.health = 0;
-
-		g_EntityFuncs.Remove(self);
+		M_FliesOff();
+		BaseClass.UpdateOnRemove();
 	}
 }
 

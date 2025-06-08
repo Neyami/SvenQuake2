@@ -243,7 +243,7 @@ final class npc_q2flyer : ScriptBaseMonsterEntity, CBaseQ1Flying
 		GetSoundEntInstance().InsertSound( bits_SOUND_COMBAT, pev.origin, 192, 0.3, self );
 
 		monster_muzzleflash( vecMuzzle, 255, 255, 0, 5 );
-		monster_fire_weapon( q2npc::WEAPON_BLASTER, vecMuzzle, vecAim, BLASTER_DAMAGE, BLASTER_SPEED );
+		monster_fire_weapon( q2::WEAPON_BLASTER, vecMuzzle, vecAim, BLASTER_DAMAGE, BLASTER_SPEED );
 	}
 
 	void flyer_pop_blades()
@@ -293,10 +293,7 @@ final class npc_q2flyer : ScriptBaseMonsterEntity, CBaseQ1Flying
 		float psave = 0.0; //CheckPowerArmor( pevInflictor, flDamage );
 		flDamage -= psave;
 
-		if( pev.health < (pev.max_health / 2) )
-			pev.skin |= 1;
-		else
-			pev.skin &= ~1;
+		SetSkin();
 
 		if( pevAttacker !is self.pev )
 			pevAttacker.frags += ( flDamage/90 );
@@ -312,12 +309,20 @@ final class npc_q2flyer : ScriptBaseMonsterEntity, CBaseQ1Flying
 				HandlePain( flDamage );
 
 				// nightmare mode monsters don't go into pain frames often
-				if( q2npc::g_iDifficulty == q2npc::DIFF_NIGHTMARE )
+				if( q2npc::g_iDifficulty == q2::DIFF_NIGHTMARE )
 					m_flPainDebounceTime = g_Engine.time + 5.0;
 			}
 		}
 
 		return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
+	}
+
+	void MonsterSetSkin()
+	{
+		if( pev.health < (pev.max_health / 2) )
+			pev.skin = 1;
+		else
+			pev.skin = 0;
 	}
 
 	void HandlePain( float flDamage )

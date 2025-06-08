@@ -14,7 +14,9 @@ const string MODEL_GIB_THIGH		= "models/quake2/monsters/jorg/gibs/thigh.mdl";
 const string MODEL_GIB_TUBE		= "models/quake2/monsters/jorg/gibs/tube.mdl";
 
 const Vector NPC_MINS					= Vector( -80, -80, 0 );
-const Vector NPC_MAXS					= Vector( 80, 80, 188 ); //140 in quake 2
+const Vector NPC_MAXS					= Vector( 80, 80, 140 ); //188 in svencoop
+const Vector NPC_MINS_DEAD		= Vector( -16, -16, 0 );
+const Vector NPC_MAXS_DEAD		= Vector( 16, 16, 8 );
 
 const int NPC_HEALTH_ORG			= 3000;
 const int NPC_HEALTH_RE				= 8000;
@@ -199,7 +201,7 @@ final class npc_q2jorg : CBaseQ2NPC
 		return CLASS_ALIEN_MILITARY;
 	}
 
-	void SearchSound()
+	void MonsterSearch()
 	{
 		float flRand = Math.RandomFloat( 0.0, 1.0 );
 
@@ -243,7 +245,7 @@ final class npc_q2jorg : CBaseQ2NPC
 
 		BaseClass.RunAI();
 
-		DoSearchSound();
+		DoMonsterSearch();
 		CheckArmorEffect();
 
 		if( m_bRerelease and pev.deadflag == DEAD_DYING )
@@ -274,7 +276,7 @@ final class npc_q2jorg : CBaseQ2NPC
 		}
 	}
 
-	void RunTask( Task@ pTask )
+	void MonsterRunTask( Task@ pTask )
 	{
 		switch( pTask.iTask )
 		{
@@ -338,13 +340,13 @@ final class npc_q2jorg : CBaseQ2NPC
 		return BaseClass.GetScheduleOfType( iType );
 	}
 
-	void HandleAnimEventQ2( MonsterEvent@ pEvent )
+	void MonsterHandleAnimEvent( MonsterEvent@ pEvent )
 	{
 		switch( pEvent.event )
 		{
-			case q2npc::AE_IDLESOUND:
+			case q2::AE_IDLESOUND:
 			{
-				if( !HasFlags(m_iSpawnFlags, q2npc::SPAWNFLAG_MONSTER_AMBUSH) )
+				if( !HasFlags(m_iSpawnFlags, q2::SPAWNFLAG_MONSTER_AMBUSH) )
 					g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_IDLE], VOL_NORM, ATTN_NORM );
 
 				break;
@@ -352,7 +354,7 @@ final class npc_q2jorg : CBaseQ2NPC
 
 			case AE_STEP_LEFT:
 			{
-				if( !HasFlags(m_iSpawnFlags, q2npc::SPAWNFLAG_MONSTER_AMBUSH) )
+				if( !HasFlags(m_iSpawnFlags, q2::SPAWNFLAG_MONSTER_AMBUSH) )
 					jorg_step_left();
 
 				break;
@@ -360,7 +362,7 @@ final class npc_q2jorg : CBaseQ2NPC
 
 			case AE_STEP_RIGHT:
 			{
-				if( !HasFlags(m_iSpawnFlags, q2npc::SPAWNFLAG_MONSTER_AMBUSH) )
+				if( !HasFlags(m_iSpawnFlags, q2::SPAWNFLAG_MONSTER_AMBUSH) )
 					jorg_step_right();
 
 				break;
@@ -448,7 +450,7 @@ final class npc_q2jorg : CBaseQ2NPC
 
 		MachineGunEffects( vecMuzzle, 3 );
 		monster_muzzleflash( vecMuzzle, 255, 255, 0, 10 );
-		monster_fire_weapon( q2npc::WEAPON_BULLET, vecMuzzle, vecAim, GUN_DAMAGE );
+		monster_fire_weapon( q2::WEAPON_BULLET, vecMuzzle, vecAim, GUN_DAMAGE );
 	}
 
 	void jorg_firebullet_right()
@@ -466,7 +468,7 @@ final class npc_q2jorg : CBaseQ2NPC
 
 		MachineGunEffects( vecMuzzle, 3 );
 		monster_muzzleflash( vecMuzzle, 255, 255, 0, 10 );
-		monster_fire_weapon( q2npc::WEAPON_BULLET, vecMuzzle, vecAim, GUN_DAMAGE );
+		monster_fire_weapon( q2::WEAPON_BULLET, vecMuzzle, vecAim, GUN_DAMAGE );
 	}
 
 	bool jorg_reattack1()
@@ -509,7 +511,7 @@ final class npc_q2jorg : CBaseQ2NPC
 		vecAim = (vecEnemyOrigin - vecMuzzle).Normalize();
 
 		monster_muzzleflash( vecMuzzle, 128, 255, 128, 30 );
-		monster_fire_weapon( q2npc::WEAPON_BFG, vecMuzzle, vecAim, BFG_DAMAGE, BFG_SPEED );
+		monster_fire_weapon( q2::WEAPON_BFG, vecMuzzle, vecAim, BFG_DAMAGE, BFG_SPEED );
 	}
 
 	void jorg_step_left()
@@ -532,10 +534,7 @@ final class npc_q2jorg : CBaseQ2NPC
 		float psave = CheckPowerArmor( pevInflictor, flDamage );
 		flDamage -= psave;
 
-		if( pev.health < (pev.max_health / 2) )
-			pev.skin |= 1;
-		else
-			pev.skin &= ~1;
+		SetSkin();
 
 		if( pevAttacker !is self.pev )
 			pevAttacker.frags += ( flDamage/90 );
@@ -555,6 +554,14 @@ final class npc_q2jorg : CBaseQ2NPC
 		M_ReactToDamage( g_EntityFuncs.Instance(pevAttacker) );
 
 		return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
+	}
+
+	void MonsterSetSkin()
+	{
+		if( pev.health < (pev.max_health / 2) )
+			pev.skin = 1;
+		else
+			pev.skin = 0;
 	}
 
 	void HandlePain( float flDamage, string sWeaponName )
@@ -743,7 +750,7 @@ final class npc_q2jorg : CBaseQ2NPC
 		g_SoundSystem.EmitSound( self.edict(), CHAN_BODY, arrsNPCSounds[SND_EXPLOSION], VOL_NORM, ATTN_NORM );
 	}
 
-	void GibMonster()
+	void MonsterGib()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_DEATH_GIB], VOL_NORM, ATTN_NORM );
 
@@ -770,9 +777,7 @@ final class npc_q2jorg : CBaseQ2NPC
 		q2::ThrowGib( self, 4, MODEL_GIB_TUBE, 500, -1 );
 
 		Explosion( pev.origin, 90 );
-
-		SetThink( ThinkFunction(this.SUB_Remove) );
-		pev.nextthink = g_Engine.time;
+		g_EntityFuncs.Remove( self );
 	}
 
 	void MakronSpawn()
@@ -798,16 +803,6 @@ final class npc_q2jorg : CBaseQ2NPC
 			if( self.m_hEnemy.IsValid() )
 				pMakron.m_hEnemy = self.m_hEnemy;
 		}
-	}
-
-	void SUB_Remove()
-	{
-		self.UpdateOnRemove();
-
-		if( pev.health > 0 )
-			pev.health = 0;
-
-		g_EntityFuncs.Remove(self);
 	}
 }
 

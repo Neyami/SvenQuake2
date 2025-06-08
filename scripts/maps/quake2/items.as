@@ -991,6 +991,7 @@ mixin class item_q2pickup
 		{
 			pCustom.InitializeKeyvalueWithDefault( INVIS_KVN );
 			pCustom.InitializeKeyvalueWithDefault( INVIS_KVN_TIME );
+			pCustom.InitializeKeyvalueWithDefault( INVIS_KVN_FADETIME );
 		}
 
 		g_SoundSystem.EmitSound( pOther.edict(), CHAN_ITEM, m_sSound, VOL_NORM, ATTN_NORM );
@@ -1591,6 +1592,9 @@ bool IsItemActive( CBasePlayer@ pPlayer, int iItem )
 
 		case q2::IT_ITEM_ENVIROSUIT:
 			return pCustom.GetKeyvalue(ENVIRO_KVN).GetInteger() >= 1;
+
+		case q2::IT_ITEM_INVISIBILITY:
+			return pCustom.GetKeyvalue(INVIS_KVN).GetInteger() >= 1;
 	}
 
 	return false;

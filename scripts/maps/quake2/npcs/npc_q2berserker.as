@@ -11,7 +11,9 @@ const string MODEL_GIB_HEAD		= "models/quake2/monsters/berserker/gibs/head.mdl";
 const string MODEL_GIB_THIGH		= "models/quake2/monsters/berserker/gibs/thigh.mdl";
 
 const Vector NPC_MINS					= Vector( -16, -16, 0 );
-const Vector NPC_MAXS					= Vector( 16, 16, 80 ); //56 in original
+const Vector NPC_MAXS					= Vector( 16, 16, 56 ); //80 in svencoop
+const Vector NPC_MINS_DEAD		= Vector( -16, -16, 0 );
+const Vector NPC_MAXS_DEAD		= Vector( 16, 16, 8 );
 
 const int NPC_HEALTH					= 240;
 
@@ -19,13 +21,6 @@ const int AE_ATTACK_SPIKE			= 11;
 const int AE_ATTACK_CLUB				= 12;
 const int AE_ATTACKSOUND			= 13;
 const int AE_FIDGETCHECK				= 14;
-
-const float SPIKE_DMG_MIN			= 5.0;
-const float SPIKE_DMG_MAX			= 11.0;
-const float CLUB_DMG_MIN			= 15.0;
-const float CLUB_DMG_MAX			= 21.0;
-const float MELEE_KICK_SPIKE		= 100.0;
-const float MELEE_KICK_CLUB		= 400.0;
 
 const array<string> arrsNPCSounds =
 {
@@ -131,12 +126,12 @@ final class npc_q2berserker : CBaseQ2NPC
 		return CLASS_ALIEN_MILITARY;
 	}
 
-	void MonsterAlertSound()
+	void MonsterSight()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_SIGHT], VOL_NORM, ATTN_NORM );
 	}
 
-	void SearchSound()
+	void MonsterSearch()
 	{
 		if( Math.RandomLong(0, 1) == 1 )
 			g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_IDLE2], VOL_NORM, ATTN_NORM );
@@ -151,7 +146,7 @@ final class npc_q2berserker : CBaseQ2NPC
 
 	void berserk_fidget()
 	{
-		if( !HasFlags(m_iSpawnFlags, q2npc::SPAWNFLAG_MONSTER_AMBUSH) )
+		if( !HasFlags(m_iSpawnFlags, q2::SPAWNFLAG_MONSTER_AMBUSH) )
 		{
 			/*if( HasFlags(monsterinfo.aiflags, AI_STAND_GROUND) )
 				return;
@@ -167,11 +162,11 @@ final class npc_q2berserker : CBaseQ2NPC
 		}
 	}
 
-	void HandleAnimEventQ2( MonsterEvent@ pEvent )
+	void MonsterHandleAnimEvent( MonsterEvent@ pEvent )
 	{
 		switch( pEvent.event )
 		{
-			case q2npc::AE_IDLESOUND:
+			case q2::AE_IDLESOUND:
 			{
 				g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_IDLE1], VOL_NORM, ATTN_IDLE );
 				break;
@@ -192,63 +187,54 @@ final class npc_q2berserker : CBaseQ2NPC
 
 			case AE_ATTACK_SPIKE:
 			{
-				MeleeAttack();
+				berserk_attack_spike();
 				break;
 			}
 
 			case AE_ATTACK_CLUB:
 			{
-				MeleeAttack( true );
+				berserk_attack_club();
 				break;
 			}
 		}
 	}
 
-	void MeleeAttack( bool bClubAttack = false )
+	//Faster attack -- upwards and backwards
+	void berserk_attack_spike()
 	{
-		float flDamage = Math.RandomFloat( SPIKE_DMG_MIN, SPIKE_DMG_MAX );
-		if( bClubAttack ) flDamage = Math.RandomFloat( CLUB_DMG_MIN, CLUB_DMG_MAX );
-
-		CBaseEntity@ pHurt = CheckTraceHullAttack( Q2_MELEE_DISTANCE, flDamage, DMG_SLASH );
-		if( pHurt !is null )
+		if( m_bRerelease )
 		{
-			if( pHurt.pev.FlagBitSet(FL_MONSTER) or pHurt.pev.FlagBitSet(FL_CLIENT) )
-			{
-				Math.MakeVectors( pev.angles );
+			Vector aim = Vector( Q2_MELEE_DISTANCE_RR, 0, -24 );
 
-				if( bClubAttack and pHurt.pev.size.z <= 88.0 )
-				{
-					pHurt.pev.punchangle.z = 18;
-					pHurt.pev.punchangle.x = 5;
-					
-					pHurt.pev.velocity = pHurt.pev.velocity + g_Engine.v_right * MELEE_KICK_CLUB;
-				}
-				else if( pHurt.pev.size.z <= 88.0 )
-				{
-					pHurt.pev.punchangle.x = 5;
-					pHurt.pev.velocity = pHurt.pev.velocity + g_Engine.v_forward * MELEE_KICK_SPIKE + g_Engine.v_up * (MELEE_KICK_SPIKE * 3.0);
-				}
-			}
+			if( !fire_hit(aim, Math.RandomFloat(5.0, 11.0), 80) )
+				monsterinfo.melee_debounce_time = g_Engine.time + 1.2;
 		}
 		else
 		{
-			if( bClubAttack )
-				m_flMeleeCooldown = g_Engine.time + 2.5;
-			else
-				m_flMeleeCooldown = g_Engine.time + 1.2;
+			Vector aim = Vector( Q2_MELEE_DISTANCE, 0, -24 );
+			fire_hit( aim, 15 + Math.RandomFloat(0.0, 6.0), 400 ); //(15 + (rand() % 6))
+		}
+	}
+
+	//Slower attack
+	void berserk_attack_club()
+	{
+		if( m_bRerelease )
+		{
+			Vector aim = Vector( Q2_MELEE_DISTANCE_RR, pev.mins.x, -4 );
+
+			if( !fire_hit(aim, Math.RandomFloat(15.0, 21.0), 400) )
+				monsterinfo.melee_debounce_time = g_Engine.time + 2.5;
+		}
+		else
+		{
+			Vector aim = Vector( Q2_MELEE_DISTANCE, pev.mins.x, -4 );
+			fire_hit( aim, 5 + Math.RandomFloat(0.0, 6.0), 400 ); //(5 + (rand() % 6))
 		}
 	}
 
 	bool CheckMeleeAttack2( float flDot, float flDist ) { return false; }
 	bool CheckRangeAttack2( float flDot, float flDist ) { return false; }
-
-	bool CheckMeleeAttack1( float flDot, float flDist )
-	{
-		if( flDist <= 64 and flDot >= 0.7 and self.m_hEnemy.IsValid() and self.m_hEnemy.GetEntity().pev.FlagBitSet(FL_ONGROUND) and g_Engine.time > m_flMeleeCooldown )
-			return true;
-
-		return false;
-	}
 
 	bool CheckRangeAttack1( float flDot, float flDist ) //flDist > 64 and flDist <= 784 and flDot >= 0.5
 	{
@@ -263,10 +249,7 @@ final class npc_q2berserker : CBaseQ2NPC
 		float psave = CheckPowerArmor( pevInflictor, flDamage );
 		flDamage -= psave;
 
-		if( pev.health < (pev.max_health / 2) )
-			pev.skin |= 1;
-		else
-			pev.skin &= ~1;
+		SetSkin();
 
 		if( pevAttacker !is self.pev )
 			pevAttacker.frags += ( flDamage/90 );
@@ -278,7 +261,18 @@ final class npc_q2berserker : CBaseQ2NPC
 
 		M_ReactToDamage( g_EntityFuncs.Instance(pevAttacker) );
 
-		return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
+		if( pev.deadflag == DEAD_NO )
+			return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
+		else
+			return DeadTakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
+	}
+
+	void MonsterSetSkin()
+	{
+		if( pev.health < (pev.max_health / 2) )
+			pev.skin = 1;
+		else
+			pev.skin = 0;
 	}
 
 	void HandlePain( float flDamage )
@@ -329,7 +323,37 @@ final class npc_q2berserker : CBaseQ2NPC
 		}
 	}
 
-	void GibMonster()
+	//nameOfMonster_dead
+	void MonsterDead()
+	{
+		if( m_bRerelease )
+		{
+			g_EntityFuncs.SetSize( self.pev, NPC_MINS_DEAD, NPC_MAXS_DEAD );
+			monster_dead();
+		}
+		else
+		{
+			g_EntityFuncs.SetSize( self.pev, NPC_MINS_DEAD, NPC_MAXS_DEAD );
+			pev.movetype = MOVETYPE_TOSS;
+			//self->svflags |= SVF_DEADMONSTER;
+			pev.nextthink = 0;
+			g_EntityFuncs.SetOrigin( self, pev.origin ); //gi.linkentity (self);
+		}
+	}
+
+	//FUCKING ERROR: CustomEntityCallbackHandler::SetThinkFunction: function must be a delegate of the owning object type! BULLSHIT
+	void monster_dead()
+	{
+		SetThink( ThinkFunction(this.monster_dead_think) );
+		monster_dead_base();
+	}
+
+	void monster_dead_think()
+	{
+		monster_dead_think_base();
+	}
+
+	void MonsterGib()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_DEATH_GIB], VOL_NORM, ATTN_NORM );
 
@@ -340,22 +364,6 @@ final class npc_q2berserker : CBaseQ2NPC
 		q2::ThrowGib( self, 1, MODEL_GIB_HAMMER, pev.dmg, 10, BREAK_CONCRETE );
 		q2::ThrowGib( self, 1, MODEL_GIB_THIGH, pev.dmg, Math.RandomLong(0, 1) == 0 ? 11 : 15, BREAK_FLESH );
 		q2::ThrowGib( self, 1, MODEL_GIB_HEAD, pev.dmg, 3, BREAK_FLESH );
-
-		SetThink( ThinkFunction(this.SUB_Remove) );
-		pev.nextthink = g_Engine.time;
-	}
- 
-	void SUB_Remove()
-	{
-		self.UpdateOnRemove();
-
-		if( pev.health > 0 )
-		{
-			// this situation can screw up monsters who can't tell their entity pointers are invalid.
-			pev.health = 0;
-		}
-
-		g_EntityFuncs.Remove(self);
 	}
 }
 

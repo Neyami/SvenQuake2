@@ -11,7 +11,9 @@ const string MODEL_GIB_GUN			= "models/quake2/monsters/gunner/gibs/gun.mdl";
 const string MODEL_GIB_HEAD		= "models/quake2/monsters/gunner/gibs/head.mdl";
 
 const Vector NPC_MINS					= Vector( -16, -16, 0 );
-const Vector NPC_MAXS					= Vector( 16, 16, 88 ); //60 in quake 2
+const Vector NPC_MAXS					= Vector( 16, 16, 60 ); //88 in svencoop
+const Vector NPC_MINS_DEAD		= Vector( -16, -16, 0 );
+const Vector NPC_MAXS_DEAD		= Vector( 16, 16, 8 );
 
 const int NPC_HEALTH					= 175.0;
 
@@ -138,12 +140,12 @@ final class npc_q2gunner : CBaseQ2NPC
 		return CLASS_ALIEN_MILITARY;
 	}
 
-	void MonsterAlertSound()
+	void MonsterSight()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_SIGHT], VOL_NORM, ATTN_NORM );
 	}
 
-	void SearchSound()
+	void MonsterSearch()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_SEARCH], VOL_NORM, ATTN_NORM );
 	}
@@ -186,7 +188,7 @@ final class npc_q2gunner : CBaseQ2NPC
 		}
 	}
 
-	void RunTask( Task@ pTask )
+	void MonsterRunTask( Task@ pTask )
 	{
 		switch( pTask.iTask )
 		{
@@ -271,11 +273,11 @@ final class npc_q2gunner : CBaseQ2NPC
 		return BaseClass.GetScheduleOfType( iType );
 	}
 
-	void HandleAnimEventQ2( MonsterEvent@ pEvent )
+	void MonsterHandleAnimEvent( MonsterEvent@ pEvent )
 	{
 		switch( pEvent.event )
 		{
-			case q2npc::AE_IDLESOUND:
+			case q2::AE_IDLESOUND:
 			{
 				g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_IDLE], VOL_NORM, ATTN_IDLE );
 
@@ -319,7 +321,7 @@ final class npc_q2gunner : CBaseQ2NPC
 
 	void gunner_fidget()
 	{
-		if( !HasFlags(m_iSpawnFlags, q2npc::SPAWNFLAG_MONSTER_AMBUSH) )
+		if( !HasFlags(m_iSpawnFlags, q2::SPAWNFLAG_MONSTER_AMBUSH) )
 		{
 			/*if( HasFlags(monsterinfo.aiflags, AI_STAND_GROUND) )
 				return;
@@ -424,20 +426,20 @@ final class npc_q2gunner : CBaseQ2NPC
 
 			//try search for best pitch
 			if( M_CalculatePitchToFire(vecTarget, vecMuzzle, vecAim, 600, 2.5, false) )
-				monster_fire_weapon( q2npc::WEAPON_GRENADE, vecMuzzle, vecAim, GRENADE_DMG, GRENADE_SPEED, q2::crandom_open() * 10.0, Math.RandomFloat(0.0, 1.0) * 10.0 );
+				monster_fire_weapon( q2::WEAPON_GRENADE, vecMuzzle, vecAim, GRENADE_DMG, GRENADE_SPEED, q2::crandom_open() * 10.0, Math.RandomFloat(0.0, 1.0) * 10.0 );
 			else
 			{
 				//normal shot
 				Math.MakeVectors( pev.angles );
 				vecAim = g_Engine.v_forward;
-				monster_fire_weapon( q2npc::WEAPON_GRENADE, vecMuzzle, vecAim, GRENADE_DMG, GRENADE_SPEED, q2::crandom_open() * 10.0, 200.0 + (q2::crandom_open() * 10.0) );
+				monster_fire_weapon( q2::WEAPON_GRENADE, vecMuzzle, vecAim, GRENADE_DMG, GRENADE_SPEED, q2::crandom_open() * 10.0, 200.0 + (q2::crandom_open() * 10.0) );
 			}
 		}
 		else
 		{
 			Math.MakeVectors( pev.angles );
 			vecAim = g_Engine.v_forward;
-			monster_fire_weapon( q2npc::WEAPON_GRENADE, vecMuzzle, vecAim, GRENADE_DMG, GRENADE_SPEED );
+			monster_fire_weapon( q2::WEAPON_GRENADE, vecMuzzle, vecAim, GRENADE_DMG, GRENADE_SPEED );
 		}
 
 		g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_GRENADE], VOL_NORM, ATTN_NORM );
@@ -470,7 +472,7 @@ final class npc_q2gunner : CBaseQ2NPC
 
 		MachineGunEffects( vecMuzzle, 3 );
 		monster_muzzleflash( vecMuzzle, 255, 255, 0, 10 );
-		monster_fire_weapon( q2npc::WEAPON_BULLET, vecMuzzle, vecAim, GUN_DAMAGE );
+		monster_fire_weapon( q2::WEAPON_BULLET, vecMuzzle, vecAim, GUN_DAMAGE );
 	}
 
 	int TakeDamage( entvars_t@ pevInflictor, entvars_t@ pevAttacker, float flDamage, int bitsDamageType )
@@ -478,10 +480,7 @@ final class npc_q2gunner : CBaseQ2NPC
 		float psave = CheckPowerArmor( pevInflictor, flDamage );
 		flDamage -= psave;
 
-		if( pev.health < (pev.max_health / 2) )
-			pev.skin |= 1;
-		else
-			pev.skin &= ~1;
+		SetSkin();
 
 		if( pevAttacker !is self.pev )
 			pevAttacker.frags += ( flDamage/90 );
@@ -491,7 +490,20 @@ final class npc_q2gunner : CBaseQ2NPC
 		if( pev.deadflag == DEAD_NO )
 			HandlePain( flDamage );
 
-		return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
+		M_ReactToDamage( g_EntityFuncs.Instance(pevAttacker) );
+
+		if( pev.deadflag == DEAD_NO )
+			return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
+		else
+			return DeadTakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
+	}
+
+	void MonsterSetSkin()
+	{
+		if( pev.health < (pev.max_health / 2) )
+			pev.skin |= 1;
+		else
+			pev.skin &= ~1;
 	}
 
 	void HandlePain( float flDamage )
@@ -514,7 +526,37 @@ final class npc_q2gunner : CBaseQ2NPC
 			self.ChangeSchedule( slQ2Pain1 );
 	}
 
-	void GibMonster()
+	//nameOfMonster_dead
+	void MonsterDead()
+	{
+		if( m_bRerelease )
+		{
+			g_EntityFuncs.SetSize( self.pev, NPC_MINS_DEAD, NPC_MAXS_DEAD );
+			monster_dead();
+		}
+		else
+		{
+			g_EntityFuncs.SetSize( self.pev, NPC_MINS_DEAD, NPC_MAXS_DEAD );
+			pev.movetype = MOVETYPE_TOSS;
+			//self->svflags |= SVF_DEADMONSTER;
+			pev.nextthink = 0;
+			g_EntityFuncs.SetOrigin( self, pev.origin ); //gi.linkentity (self);
+		}
+	}
+
+	//FUCKING ERROR: CustomEntityCallbackHandler::SetThinkFunction: function must be a delegate of the owning object type! BULLSHIT
+	void monster_dead()
+	{
+		SetThink( ThinkFunction(this.monster_dead_think) );
+		monster_dead_base();
+	}
+
+	void monster_dead_think()
+	{
+		monster_dead_think_base();
+	}
+
+	void MonsterGib()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_DEATH_GIB], VOL_NORM, ATTN_NORM );
 
@@ -525,22 +567,6 @@ final class npc_q2gunner : CBaseQ2NPC
 		q2::ThrowGib( self, 1, MODEL_GIB_GUN, pev.dmg, 9 );
 		q2::ThrowGib( self, 1, MODEL_GIB_FOOT, pev.dmg, Math.RandomLong(0, 1) == 0 ? 4 : 25, BREAK_FLESH );
 		q2::ThrowGib( self, 1, MODEL_GIB_HEAD, pev.dmg, 7, BREAK_FLESH );
-
-		SetThink( ThinkFunction(this.SUB_Remove) );
-		pev.nextthink = g_Engine.time;
-	}
- 
-	void SUB_Remove()
-	{
-		self.UpdateOnRemove();
-
-		if( pev.health > 0 )
-		{
-			// this situation can screw up monsters who can't tell their entity pointers are invalid.
-			pev.health = 0;
-		}
-
-		g_EntityFuncs.Remove(self);
 	}
 }
 

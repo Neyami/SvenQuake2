@@ -2,6 +2,8 @@
 #include "npcs/q2npcentities"
 #include "npcs/q2/fire_funcs"
 #include "npcs/q2npcflying"
+#include "entities/bossexploder"
+#include "entities/spawngro"
 
 #include "npcs/npc_q2soldier" //20-40 HP
 #include "npcs/npc_q2flyer" //50 HP
@@ -10,6 +12,7 @@
 #include "npcs/npc_q2gunner" //175 HP
 #include "npcs/npc_q2ironmaiden" //175 HP
 #include "npcs/npc_q2berserker" //240 HP
+#include "npcs/npc_q2brains" //300 HP
 #include "npcs/npc_q2gladiator" //400 HP
 #include "npcs/npc_q2tank" //750-1000 HP
 #include "npcs/npc_q2supertank" //1500 HP
@@ -31,17 +34,8 @@ int g_iChaosMode;
 const Vector DEFAULT_BULLET_SPREAD = VECTOR_CONE_3DEGREES;
 const Vector DEFAULT_SHOTGUN_SPREAD = VECTOR_CONE_5DEGREES;
 
-enum sflag_e
-{
-	SPAWNFLAG_MONSTER_AMBUSH = 1,
-	SPAWNFLAG_MONSTER_TRIGGER_SPAWN = 2/*,
-	SPAWNFLAG_MONSTER_DEAD = 65536,
-	SPAWNFLAG_MONSTER_SUPER_STEP = 131072,
-	SPAWNFLAG_MONSTER_NO_DROP = 262144,
-	SPAWNFLAG_MONSTER_SCENIC = 524288*/
-};
-
 const string KVN_MASS = "$i_q2mass";
+const string KVN_RESURRECTING = "$i_q2resurrecting";
 
 const array<string> g_arrsQ2Monsters =
 {
@@ -54,6 +48,7 @@ const array<string> g_arrsQ2Monsters =
 	"npc_q2gunner",
 	"npc_q2ironmaiden",
 	"npc_q2berserker",
+	"npc_q2brains",
 	"npc_q2gladiator",
 	"npc_q2tank",
 	"npc_q2tankc",
@@ -73,6 +68,7 @@ dictionary g_dicMonsterNames =
 	{ "npc_q2gunner", "a Gunner" },
 	{ "npc_q2ironmaiden", "an Iron Maiden" },
 	{ "npc_q2berserker", "a Berserker" },
+	{ "npc_q2brains", "a Brains" },
 	{ "npc_q2gladiator", "a Gladiator" },
 	{ "npc_q2tank", "a Tank" },
 	{ "npc_q2tankc", "a Tank Commander" },
@@ -87,57 +83,6 @@ const array<string> g_arrsQ2Projectiles =
 	"q2rocket",
 	"q2grenade",
 	"q2bfg"
-};
-
-enum animev_e
-{
-	AE_IDLESOUND = 3,
-	AE_WALKMOVE,
-	AE_FOOTSTEP,
-	AE_FLINCHRESET //HACK
-};
-
-/*
-	No pain animations in nightmare
-	Not much else at the moment
-*/
-enum diff_e
-{
-	DIFF_EASY = 0,
-	DIFF_NORMAL,
-	DIFF_HARD,
-	DIFF_NIGHTMARE
-};
-
-/*
-	0 = npc weapons are normal
-	1 = npc weapons are randomly decided at spawn
-	2 = npc weapons are random on every shot
-*/
-enum chaos_e
-{
-	CHAOS_NONE = 0,
-	CHAOS_LEVEL1,
-	CHAOS_LEVEL2
-};
-
-enum weapons_e
-{
-	WEAPON_BULLET = 0,
-	WEAPON_SHOTGUN,
-	WEAPON_BLASTER,
-	WEAPON_GRENADE,
-	WEAPON_ROCKET,
-	WEAPON_HEATSEEKING,
-	WEAPON_RAILGUN,
-	WEAPON_BFG
-};
-
-enum parmor_e
-{
-	POWER_ARMOR_NONE = 0,
-	POWER_ARMOR_SCREEN,
-	POWER_ARMOR_SHIELD
 };
 
 void InitializeNPCS()
@@ -157,11 +102,15 @@ void InitializeNPCS()
 	npc_q2gunner::Register();
 	npc_q2ironmaiden::Register();
 	npc_q2berserker::Register();
+	npc_q2brains::Register();
 	npc_q2gladiator::Register();
 	npc_q2tank::Register();
 	npc_q2supertank::Register();
 	npc_q2jorg::Register();
 	npc_q2makron::Register();
+
+	q2bossexploder::Register();
+	q2spawngro::Register();
 
 	//for stadium4q2
 	g_CustomEntityFuncs.RegisterCustomEntity( "env_te_teleport", "env_te_teleport" );
@@ -171,125 +120,69 @@ void InitializeNPCS()
 	//g_Hooks.RegisterHook( Hooks::Player::PlayerTakeDamage, @q2npc::PlayerTakeDamage );
 }
 
-/*HookReturnCode PlayerTakeDamage( DamageInfo@ pDamageInfo )
+CBaseQ2NPC@ GetQ2Pointer( CBaseEntity@ pEntity )
 {
-	if( pDamageInfo.bitsDamageType & (DMG_BURN | DMG_ACID) != 0 and pDamageInfo.pInflictor.pev.classname == "trigger_hurt" )
-		return HOOK_CONTINUE;
+	return cast<CBaseQ2NPC@>( CastToScriptClass(pEntity) );
+}
 
-	//TODO TIDY THIS UP
-	if( pDamageInfo.pAttacker !is pDamageInfo.pVictim and g_arrsQ2Projectiles.find(pDamageInfo.pInflictor.GetClassname()) >= 0 )
+int64 GetMonsterFlags( CBaseEntity@ pEntity )
+{
+	CBaseQ2NPC@ pMonster = cast<CBaseQ2NPC@>( CastToScriptClass(pEntity) );
+	if( pMonster !is null )
+		return pMonster.m_iMonsterFlags;
+
+	return q2::FL_NONE;
+}
+
+//from quake 2 rerelease
+//adjust the monster's health from how many active players we have
+void G_Monster_ScaleCoopHealth( CBaseEntity@ pEntity )
+{
+	CBaseQ2NPC@ pMonster = q2npc::GetQ2Pointer(pEntity);
+	if( pMonster is null )
+		return;
+
+	// already scaled
+	if( pMonster.monsterinfo.health_scaling >= g_PlayerFuncs.GetNumPlayers() ) //level.coop_scale_players
+		return;
+
+	// this is just to fix monsters that change health after spawning...
+	// looking at you, soldiers
+	if( pMonster.monsterinfo.base_health <= 0 )
+		pMonster.monsterinfo.base_health = pMonster.pev.max_health;
+
+	int iDelta = g_PlayerFuncs.GetNumPlayers() - pMonster.monsterinfo.health_scaling;
+	float flAdditionalHealth = iDelta * ( pMonster.monsterinfo.base_health * q2::cvar_CoopHealthScaling.GetFloat() ); //level.coop_health_scaling
+
+	pMonster.pev.health = Math.max( 1, pMonster.pev.health + flAdditionalHealth );
+	pMonster.pev.max_health += flAdditionalHealth;
+
+	pMonster.monsterinfo.health_scaling = g_PlayerFuncs.GetNumPlayers();
+}
+
+//from quake 2 rerelease
+// check all active monsters' scaling
+void G_Monster_CheckCoopHealthScaling()
+{
+	//for (auto monster : entity_iterable_t<monster_filter_t>())
+	//return self->inuse && (self->flags & FL_COOP_HEALTH_SCALE) && self->health > 0; 
+
+	edict_t@ edict = null;
+	CBaseEntity@ pEntity = null;
+
+	for( int i = 0; i < g_Engine.maxEntities; ++i )
 	{
-		CBasePlayer@ pVictim = cast<CBasePlayer@>( pDamageInfo.pVictim );
-		CBaseEntity@ pProjectile = pDamageInfo.pInflictor;
+		@edict = @g_EntityFuncs.IndexEnt( i );
 
-		if( pVictim.IsAlive() and pDamageInfo.flDamage >= pVictim.pev.health )
+		@pEntity = g_EntityFuncs.Instance( edict );
+
+		if( pEntity !is null and g_arrsQ2Monsters.find(pEntity.GetClassname()) >= 0 and pEntity.pev.deadflag == DEAD_NO )
 		{
-			KillPlayer( pVictim, pDamageInfo.bitsDamageType );
-
-			string sDeathMsg, sModeOfDeath, sMonsterName;
-			g_dicMonsterNames.get( pProjectile.pev.netname, sMonsterName );
-
-			CustomKeyvalues@ pCustom = pVictim.GetCustomKeyvalues();
-
-			switch( pCustom.GetKeyvalue(q2::KVN_MOD).GetInteger() )
-			{
-				case q2::MOD_ROCKET:
-				{
-					sDeathMsg = string(pVictim.pev.netname) + " ate " + sMonsterName + "'s rocket.\n";
-					break;
-				}
-
-				case q2::MOD_R_SPLASH:
-				{
-					sDeathMsg = string(pVictim.pev.netname) + " almost dodged " + sMonsterName + "'s rocket.\n";
-					break;
-				}
-
-				default:
-				{
-					sDeathMsg = string(pVictim.pev.netname) + "died.\n";
-					break;
-				}
-			}
-/*
-			if( pProjectile.GetClassname() == "q2laser" )
-			{
-				if( pProjectile.pev.netname == "target_blaster" )
-					sDeathMsg = string(pVictim.pev.netname) + " got blasted\n";
-				else
-					sDeathMsg = string(pVictim.pev.netname) + " was blasted by " + sMonsterName + "\n";
-			}
-			else if( pProjectile.GetClassname() == "q2rocket" )
-			{
-				if( Math.RandomLong(1, 10) <= 5 )
-					sDeathMsg = string(pVictim.pev.netname) + " almost dodged " + sMonsterName + "'s rocket\n";
-				else
-					sDeathMsg = string(pVictim.pev.netname) + " ate " + sMonsterName + "'s rocket\n";
-			}
-			else if( pProjectile.GetClassname() == "q2grenade" )
-				sDeathMsg = string(pVictim.pev.netname) + " was popped by " + sMonsterName + "'s grenade\n";
-			else if( pProjectile.GetClassname() == "q2bfg" )
-				sDeathMsg = string(pVictim.pev.netname) + " was disintegrated by " + sMonsterName + "'s BFG\n";
-			else
-				return HOOK_CONTINUE;
-
-			g_PlayerFuncs.ClientPrintAll( HUD_PRINTNOTIFY, sDeathMsg );
-
-			return HOOK_CONTINUE;
+			//g_Game.AlertMessage( at_notice, "Running G_Monster_ScaleCoopHealth on %1\n", pEntity.GetClassname() );
+			G_Monster_ScaleCoopHealth( pEntity );
 		}
 	}
-
-	if( pDamageInfo.pAttacker is null )
-		return HOOK_CONTINUE;
-
-	if( g_arrsQ2Monsters.find(pDamageInfo.pAttacker.GetClassname()) >= 0 )
-	{
-		CBasePlayer@ pVictim = cast<CBasePlayer@>( pDamageInfo.pVictim );
-
-		if( pVictim.IsAlive() and pDamageInfo.flDamage >= pVictim.pev.health )
-		{
-			KillPlayer( pVictim, pDamageInfo.bitsDamageType );
-
-			string sDeathMsg, sMonsterName;
-			g_dicMonsterNames.get( pDamageInfo.pAttacker.GetClassname(), sMonsterName );
-
-			if( pDamageInfo.bitsDamageType & (DMG_ALWAYSGIB + DMG_CRUSH) == (DMG_ALWAYSGIB + DMG_CRUSH) )
-				sDeathMsg = string(pVictim.pev.netname) + " tried to invade " + sMonsterName + "'s personal space.\n";
-			else if( HasFlags(pDamageInfo.bitsDamageType, DMG_ENERGYBEAM) )
-				sDeathMsg = string(pVictim.pev.netname) + " was railed by " + sMonsterName + "\n";
-			else if( HasFlags(pDamageInfo.bitsDamageType, DMG_BULLET) )
-			{
-				if( pDamageInfo.pAttacker.GetClassname() == "npc_q2soldier" )
-					sDeathMsg = string(pVictim.pev.netname) + " was gunned down by a Shotgun Soldier\n";
-				else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2soldier_ss" )
-					sDeathMsg = string(pVictim.pev.netname) + " was machinegunned by a Machinegun Soldier\n";
-				else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2gunner" )
-					sDeathMsg = string(pVictim.pev.netname) + " was machinegunned by a Gunner\n";
-				else
-					sDeathMsg = string(pVictim.pev.netname) + " was pumped full of lead by " + sMonsterName + "\n";
-			}
-			else
-			{
-				if( pDamageInfo.pAttacker.GetClassname() == "npc_q2flyer" )
-					sDeathMsg = string(pVictim.pev.netname) + " was cut up by a Flyer's sharp wings\n";
-				else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2enforcer" )
-					sDeathMsg = string(pVictim.pev.netname) + " was bludgeoned by an Enforcer\n";
-				else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2parasite" )
-					sDeathMsg = string(pVictim.pev.netname) + " was exsanguinated by a Parasite\n";
-				else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2ironmaiden" )
-					sDeathMsg = string(pVictim.pev.netname) + " was bitch-slapped by an Iron Maiden\n";
-				else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2berserker" )
-					sDeathMsg = string(pVictim.pev.netname) + " was smashed by a Berserker\n";
-				else if( pDamageInfo.pAttacker.GetClassname() == "npc_q2gladiator" )
-					sDeathMsg = string(pVictim.pev.netname) + " was mangled by a Gladiator's claw\n";
-			}
-
-			g_PlayerFuncs.ClientPrintAll( HUD_PRINTNOTIFY, sDeathMsg );
-		}
-	}
-
-	return HOOK_CONTINUE;
-}*/
+}
 
 //from quake 2 rerelease
 Vector slerp( const Vector &in vecFrom, const Vector &in vecTo, float t )
@@ -337,7 +230,7 @@ bool HasFlags( int iFlagVariable, int iFlags )
 */
 
 /* TODO
-	Change idle sounds so they can make use of SPAWNFLAG_MONSTER_AMBUSH
+	Change idle sounds so they can make use of q2::SPAWNFLAG_MONSTER_AMBUSH
 
 	Add Trigger Spawn
 

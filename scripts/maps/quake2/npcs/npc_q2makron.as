@@ -3,8 +3,10 @@ namespace npc_q2makron
 
 const string NPC_MODEL				= "models/quake2/monsters/makron/makron.mdl";
 
-const Vector NPC_MINS					= Vector( -32, -32, 0 );
-const Vector NPC_MAXS					= Vector( 32, 32, 128 ); //90 in quake 2
+const Vector NPC_MINS					= Vector( -30, -30, 0 );
+const Vector NPC_MAXS					= Vector( 30, 30, 90 ); //128 in svencoop
+const Vector NPC_MINS_DEAD		= Vector( -30, -30, 0 ); //Vector( -60, -60, 0 );
+const Vector NPC_MAXS_DEAD		= Vector( 30, 30, 16 ); //Vector( 60, 60, 24 );
 
 const int NPC_HEALTH					= 3000;
 
@@ -174,11 +176,11 @@ final class npc_q2makron : CBaseQ2NPC
 	bool CheckRangeAttack1( float flDot, float flDist )
 	{
 		//DESPERATION MOVE >:D
-		if( q2npc::g_iDifficulty >= q2npc::DIFF_NIGHTMARE )
+		if( q2npc::g_iDifficulty >= q2::DIFF_NIGHTMARE )
 		{
 			if( pev.health < (pev.max_health * 0.1) )
 			{
-				m_iWeaponType = q2npc::WEAPON_BFG;
+				m_iWeaponType = q2::WEAPON_BFG;
 				m_iWeaponType |= 2048;
 			}
 		}
@@ -249,7 +251,7 @@ final class npc_q2makron : CBaseQ2NPC
 		return BaseClass.GetScheduleOfType( iType );
 	}
 
-	void HandleAnimEventQ2( MonsterEvent@ pEvent )
+	void MonsterHandleAnimEvent( MonsterEvent@ pEvent )
 	{
 		switch( pEvent.event )
 		{
@@ -383,7 +385,8 @@ final class npc_q2makron : CBaseQ2NPC
 		vecAim = vecAim.Normalize();
 
 		monster_muzzleflash( vecMuzzle, 128, 128, 255 );
-		monster_fire_weapon( q2npc::WEAPON_RAILGUN, vecMuzzle, vecAim, RAILGUN_DAMAGE );
+		//monster_fire_railgun( vecMuzzle, vecAim, RAILGUN_DAMAGE, 100 );
+		monster_fire_weapon( q2::WEAPON_RAILGUN, vecMuzzle, vecAim, RAILGUN_DAMAGE, 100 );
 	}
 
 	void makronBFG()
@@ -399,7 +402,7 @@ final class npc_q2makron : CBaseQ2NPC
 		vecAim = (vecEnemyOrigin - vecMuzzle).Normalize();
 
 		monster_muzzleflash( vecMuzzle, 128, 255, 128, 30 );
-		monster_fire_weapon( q2npc::WEAPON_BFG, vecMuzzle, vecAim, BFG_DAMAGE, BFG_SPEED );
+		monster_fire_weapon( q2::WEAPON_BFG, vecMuzzle, vecAim, BFG_DAMAGE, BFG_SPEED );
 	}
 
 	void MakronHyperblaster()
@@ -430,7 +433,7 @@ final class npc_q2makron : CBaseQ2NPC
 		}
 
 		monster_muzzleflash( vecMuzzle, 20, 255, 255, 0 );
-		monster_fire_weapon( q2npc::WEAPON_BLASTER, vecMuzzle, vecAim, BLASTER_DAMAGE, BLASTER_SPEED );
+		monster_fire_weapon( q2::WEAPON_BLASTER, vecMuzzle, vecAim, BLASTER_DAMAGE, BLASTER_SPEED );
 	}
 
 	int TakeDamage( entvars_t@ pevInflictor, entvars_t@ pevAttacker, float flDamage, int bitsDamageType )
@@ -438,10 +441,7 @@ final class npc_q2makron : CBaseQ2NPC
 		float psave = CheckPowerArmor( pevInflictor, flDamage );
 		flDamage -= psave;
 
-		if( pev.health < (pev.max_health / 2) )
-			pev.skin |= 1;
-		else
-			pev.skin &= ~1;
+		SetSkin();
 
 		if( pevAttacker !is self.pev )
 			pevAttacker.frags += ( flDamage/90 );
@@ -461,6 +461,14 @@ final class npc_q2makron : CBaseQ2NPC
 		M_ReactToDamage( g_EntityFuncs.Instance(pevAttacker) );
 
 		return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
+	}
+
+	void MonsterSetSkin()
+	{
+		if( pev.health < (pev.max_health / 2) )
+			pev.skin = 1;
+		else
+			pev.skin = 0;
 	}
 
 	void HandlePain( float flDamage, string sWeaponName )
@@ -561,6 +569,39 @@ final class npc_q2makron : CBaseQ2NPC
 
 		pev.body = 1;
 		g_EntityFuncs.SetSize( self.pev, NPC_MINS, Vector(32, 32, 88) );
+	}
+
+	//nameOfMonster_dead
+	void MonsterDead()
+	{
+		if( m_bRerelease )
+		{
+			g_EntityFuncs.SetSize( self.pev, NPC_MINS_DEAD, NPC_MAXS_DEAD );
+			pev.movetype = MOVETYPE_TOSS;
+			//self->svflags |= SVF_DEADMONSTER;
+			g_EntityFuncs.SetOrigin( self, pev.origin ); //gi.linkentity(self);
+			monster_dead();
+		}
+		else
+		{
+			g_EntityFuncs.SetSize( self.pev, NPC_MINS_DEAD, NPC_MAXS_DEAD );
+			pev.movetype = MOVETYPE_TOSS;
+			//self->svflags |= SVF_DEADMONSTER;
+			pev.nextthink = 0;
+			g_EntityFuncs.SetOrigin( self, pev.origin ); //gi.linkentity (self);
+		}
+	}
+
+	//FUCKING ERROR: CustomEntityCallbackHandler::SetThinkFunction: function must be a delegate of the owning object type! BULLSHIT
+	void monster_dead()
+	{
+		SetThink( ThinkFunction(this.monster_dead_think) );
+		monster_dead_base();
+	}
+
+	void monster_dead_think()
+	{
+		monster_dead_think_base();
 	}
 
 	void makron_spawn_torso()

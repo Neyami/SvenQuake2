@@ -156,6 +156,7 @@ class weapon_q2supershotgun : CBaseQ2Weapon
 		Math.MakeVectors( m_pPlayer.pev.v_angle + m_pPlayer.pev.punchangle );
 		Vector vecMuzzle = m_pPlayer.GetGunPosition();
 
+		float flKick = 12;
 		float flRecoil = Q2W_RECOIL;
 		float flDamage = Q2W_DAMAGE;
 		if( self.m_flCustomDmg > 0 )
@@ -163,6 +164,7 @@ class weapon_q2supershotgun : CBaseQ2Weapon
 
 		if( CheckQuadDamage() )
 		{
+			flKick *= 4;
 			flDamage *= 4;
 			g_SoundSystem.EmitSoundDyn( m_pPlayer.edict(), CHAN_ITEM, pQ2WSounds[SND_QUAD_FIRE], GetSilencedVolume(VOL_NORM), ATTN_NORM );
 		}
@@ -171,11 +173,22 @@ class weapon_q2supershotgun : CBaseQ2Weapon
 
 		muzzleflash( vecMuzzle, 255, 255, 0, 4 );
 
-		Vector vecAim = g_Engine.v_forward + g_Engine.v_right * -0.05;
-		fire_shotgun( vecMuzzle, vecAim, flDamage, Q2W_PELLETS/2 );
+		Vector vecAim1 = g_Engine.v_forward + g_Engine.v_right * -0.05;
+		Vector vecAim2 = g_Engine.v_forward + g_Engine.v_right * 0.05;
 
-		vecAim = g_Engine.v_forward + g_Engine.v_right * 0.05;
-		fire_shotgun( vecMuzzle, vecAim, flDamage, Q2W_PELLETS/2 );
+		if( !m_bUseQ2Bullets )
+		{
+			fire_shotgun( vecMuzzle, vecAim1, flDamage, Q2W_PELLETS/2 );
+			fire_shotgun( vecMuzzle, vecAim2, flDamage, Q2W_PELLETS/2 );
+		}
+		else
+		{
+			vecAim1.z = -vecAim2.z;
+			vecAim2.z = -vecAim2.z;
+
+			q2::fire_shotgun( m_pPlayer, vecMuzzle, vecAim1, flDamage, flKick, q2::DEFAULT_SHOTGUN_HSPREAD, q2::DEFAULT_SHOTGUN_VSPREAD, q2::DEFAULT_SSHOTGUN_COUNT/2, q2::MOD_SSHOTGUN );
+			q2::fire_shotgun( m_pPlayer, vecMuzzle, vecAim2, flDamage, flKick, q2::DEFAULT_SHOTGUN_HSPREAD, q2::DEFAULT_SHOTGUN_VSPREAD, q2::DEFAULT_SSHOTGUN_COUNT/2, q2::MOD_SSHOTGUN );
+		}
 
 		if( m_pPlayer.m_rgAmmo(self.m_iPrimaryAmmoType) <= 1 )
 			m_flStopCockSound = g_Engine.time + 0.42;

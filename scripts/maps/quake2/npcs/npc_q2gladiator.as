@@ -11,7 +11,9 @@ const string MODEL_GIB_RARM		= "models/quake2/monsters/gladiator/gibs/rarm.mdl";
 const string MODEL_GIB_THIGH		= "models/quake2/monsters/gladiator/gibs/thigh.mdl";
 
 const Vector NPC_MINS					= Vector( -32, -32, 0 );
-const Vector NPC_MAXS					= Vector( 32, 32, 90 ); //66 in original
+const Vector NPC_MAXS					= Vector( 32, 32, 66 ); //90 in svencoop
+const Vector NPC_MINS_DEAD		= Vector( -16, -16, 0 );
+const Vector NPC_MAXS_DEAD		= Vector( 16, 16, 8 );
 
 const int NPC_HEALTH					= 400;
 
@@ -146,17 +148,17 @@ final class npc_q2gladiator : CBaseQ2NPC
 		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_IDLE], VOL_NORM, ATTN_IDLE );
 	}
 
-	void MonsterAlertSound()
+	void MonsterSight()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_SIGHT], VOL_NORM, ATTN_NORM );
 	}
 
-	void SearchSound()
+	void MonsterSearch()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_SEARCH], VOL_NORM, ATTN_NORM );
 	}
 
-	void HandleAnimEventQ2( MonsterEvent@ pEvent )
+	void MonsterHandleAnimEvent( MonsterEvent@ pEvent )
 	{
 		switch( pEvent.event )
 		{
@@ -214,22 +216,27 @@ final class npc_q2gladiator : CBaseQ2NPC
 
 	void GladiatorMelee()
 	{
-		float flDamage = Math.RandomFloat( MELEE_DMG_MIN, MELEE_DMG_MAX );
-
-		CBaseEntity@ pHurt = CheckTraceHullAttack( Q2_MELEE_DISTANCE, flDamage, DMG_SLASH );
-		if( pHurt !is null )
+		if( m_bRerelease )
 		{
-			if( pHurt.pev.FlagBitSet(FL_MONSTER) or pHurt.pev.FlagBitSet(FL_CLIENT) and pHurt.pev.size.z <= 88.0 )
-			{
-				pHurt.pev.punchangle.x = 5;
-				Math.MakeVectors( pev.angles );
-				pHurt.pev.velocity = pHurt.pev.velocity + g_Engine.v_forward * MELEE_KICK;
-			}
+			Vector aim = Vector( Q2_MELEE_DISTANCE_RR, pev.mins.x, -4 );
 
-			g_SoundSystem.EmitSound( self.edict(), CHAN_BODY, arrsNPCSounds[SND_MELEE_HIT], VOL_NORM, ATTN_NORM );
+			if( fire_hit(aim, Math.RandomFloat(20.0, 25.0), 300) )
+				g_SoundSystem.EmitSound( self.edict(), CHAN_AUTO, arrsNPCSounds[SND_MELEE_HIT], VOL_NORM, ATTN_NORM );
+			else
+			{
+				g_SoundSystem.EmitSound( self.edict(), CHAN_AUTO, arrsNPCSounds[SND_MELEE_MISS], VOL_NORM, ATTN_NORM );
+				monsterinfo.melee_debounce_time = g_Engine.time + 1.0;
+			}
 		}
 		else
-			g_SoundSystem.EmitSound( self.edict(), CHAN_BODY, arrsNPCSounds[SND_MELEE_MISS], VOL_NORM, ATTN_NORM );
+		{
+			Vector aim = Vector( Q2_MELEE_DISTANCE, pev.mins.x, -4 );
+
+			if( fire_hit(aim, 20 + Math.RandomFloat(0, 5), 300) ) //(20 + (rand() %5))
+				g_SoundSystem.EmitSound( self.edict(), CHAN_AUTO, arrsNPCSounds[SND_MELEE_HIT], VOL_NORM, ATTN_NORM );
+			else
+				g_SoundSystem.EmitSound( self.edict(), CHAN_AUTO, arrsNPCSounds[SND_MELEE_MISS], VOL_NORM, ATTN_NORM );
+		}
 	}
 
 	void GladiatorGun()
@@ -242,25 +249,19 @@ final class npc_q2gladiator : CBaseQ2NPC
 		self.GetAttachment( 0, vecMuzzle, void );
 
 		monster_muzzleflash( vecMuzzle, 128, 128, 255 );
-		monster_fire_weapon( q2npc::WEAPON_RAILGUN, vecMuzzle, m_vecEnemyDir, RAILGUN_DAMAGE );
+		//monster_fire_railgun( vecMuzzle, m_vecEnemyDir, RAILGUN_DAMAGE, 100 );
+		monster_fire_weapon( q2::WEAPON_RAILGUN, vecMuzzle, m_vecEnemyDir, RAILGUN_DAMAGE, 100 );
 	}
 
 	bool CheckRangeAttack1( float flDot, float flDist )
 	{
-		// a small safe zone
-		if( flDist <= (Q2_MELEE_DISTANCE + 32) )
-				return false;
-
 		if( M_CheckAttack(flDist) )
 			return true;
 
-		return false;
-	}
-
-	bool CheckMeleeAttack1( float flDot, float flDist )
-	{
-		if( flDist <= 64 and flDot >= 0.7 and self.m_hEnemy.IsValid() and self.m_hEnemy.GetEntity().pev.FlagBitSet(FL_ONGROUND) )
-			return true;
+		// a small safe zone
+		float flMeleeDistance = m_bRerelease ? Q2_MELEE_DISTANCE_RR : Q2_MELEE_DISTANCE;
+		if( flDist <= (flMeleeDistance + 32) )
+				return false;
 
 		return false;
 	}
@@ -270,10 +271,7 @@ final class npc_q2gladiator : CBaseQ2NPC
 		float psave = CheckPowerArmor( pevInflictor, flDamage );
 		flDamage -= psave;
 
-		if( pev.health < (pev.max_health / 2) )
-			pev.skin |= 1;
-		else
-			pev.skin &= ~1;
+		SetSkin();
 
 		if( pevAttacker !is self.pev )
 			pevAttacker.frags += ( flDamage/90 );
@@ -285,7 +283,18 @@ final class npc_q2gladiator : CBaseQ2NPC
 
 		M_ReactToDamage( g_EntityFuncs.Instance(pevAttacker) );
 
-		return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
+		if( pev.deadflag == DEAD_NO )
+			return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
+		else
+			return DeadTakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
+	}
+
+	void MonsterSetSkin()
+	{
+		if( pev.health < (pev.max_health / 2) )
+			pev.skin |= 1;
+		else
+			pev.skin &= ~1;
 	}
 
 	void HandlePain( float flDamage )
@@ -312,7 +321,37 @@ final class npc_q2gladiator : CBaseQ2NPC
 			self.ChangeSchedule( slQ2Pain1 );
 	}
 
-	void GibMonster()
+	//nameOfMonster_dead
+	void MonsterDead()
+	{
+		if( m_bRerelease )
+		{
+			g_EntityFuncs.SetSize( self.pev, NPC_MINS_DEAD, NPC_MAXS_DEAD );
+			monster_dead();
+		}
+		else
+		{
+			g_EntityFuncs.SetSize( self.pev, NPC_MINS_DEAD, NPC_MAXS_DEAD );
+			pev.movetype = MOVETYPE_TOSS;
+			//self->svflags |= SVF_DEADMONSTER;
+			pev.nextthink = 0;
+			g_EntityFuncs.SetOrigin( self, pev.origin ); //gi.linkentity (self);
+		}
+	}
+
+	//FUCKING ERROR: CustomEntityCallbackHandler::SetThinkFunction: function must be a delegate of the owning object type! BULLSHIT
+	void monster_dead()
+	{
+		SetThink( ThinkFunction(this.monster_dead_think) );
+		monster_dead_base();
+	}
+
+	void monster_dead_think()
+	{
+		monster_dead_think_base();
+	}
+
+	void MonsterGib()
 	{
 		g_SoundSystem.EmitSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_DEATH_GIB], VOL_NORM, ATTN_NORM );
 
@@ -324,22 +363,6 @@ final class npc_q2gladiator : CBaseQ2NPC
 		q2::ThrowGib( self, 1, MODEL_GIB_RARM, pev.dmg, 8 );
 		q2::ThrowGib( self, 1, MODEL_GIB_CHEST, pev.dmg, 5 );
 		q2::ThrowGib( self, 1, MODEL_GIB_HEAD, pev.dmg, 6, BREAK_FLESH );
-
-		SetThink( ThinkFunction(this.SUB_Remove) );
-		pev.nextthink = g_Engine.time;
-	}
- 
-	void SUB_Remove()
-	{
-		self.UpdateOnRemove();
-
-		if( pev.health > 0 )
-		{
-			// this situation can screw up monsters who can't tell their entity pointers are invalid.
-			pev.health = 0;
-		}
-
-		g_EntityFuncs.Remove(self);
 	}
 }
 

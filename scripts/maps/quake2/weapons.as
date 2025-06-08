@@ -90,13 +90,25 @@ const int AMMO_ROCKETS_GIVE		= 5;
 const int AMMO_CELLS_GIVE			= 50;
 const int AMMO_SLUGS_GIVE			= 10;
 
-CCVar@ cvar_InfiniteAmmo; //CVAR_LATCH = no change until map restart/change ??
-CClientCommand q2_infinite_ammo( "q2_infinite_ammo", "Infinite ammo for Quake 2 weapons? (default: 0)", @Quake2Settings );
+const array<string> g_arrsQ2Weapons =
+{
+	"weapon_q2blaster",
+	"weapon_q2shotgun",
+	"weapon_q2supershotgun",
+	"weapon_q2machinegun",
+	"weapon_q2chaingun",
+	"weapon_q2grenades",
+	"weapon_q2grenadelauncher",
+	"weapon_q2rocketlauncher",
+	"weapon_q2hyperblaster",
+	"weapon_q2railgun",
+	"weapon_q2bfg",
+	"weapon_q2chainfist",
+	"weapon_q2plasmabeam"
+};
 
 void Register()
 {
-	@cvar_InfiniteAmmo = CCVar( "q2-infinite-ammo", 0, "Infinite ammo for Quake 2 weapons? (default: 0)", ConCommandFlag::AdminOnly );
-
 	//Original
 	q2blaster::Register();
 	q2shotgun::Register();
@@ -113,31 +125,6 @@ void Register()
 	//Ground Zero
 	q2chainfist::Register();
 	q2plasmabeam::Register();
-}
-
-void Quake2Settings( const CCommand@ args )
-{
-	CBasePlayer@ pPlayer = g_ConCommandSystem.GetCurrentPlayer();
-
-	if( !q2::USE_QUAKE2_WEAPONS )
-	{
-		g_PlayerFuncs.ClientPrint( pPlayer, HUD_PRINTCONSOLE, "Quake 2 Weapons are disabled\n" );
-		return;
-	}
-
-	if( args.ArgC() < 2 ) //If no args are supplied
-	{
-		if( args.Arg(0) == ".q2_infinite_ammo" )
-			g_PlayerFuncs.ClientPrint( pPlayer, HUD_PRINTCONSOLE, "\"q2_infinite_ammo\" is \"" + cvar_InfiniteAmmo.GetInt() + "\"\n" );
-	}
-	else if( args.ArgC() == 2 ) //If one arg is supplied (value to set)
-	{
-		if( args.Arg(0) == ".q2_infinite_ammo" and Math.clamp(0, 1, atoi(args.Arg(1))) != cvar_InfiniteAmmo.GetInt() )
-		{
-			cvar_InfiniteAmmo.SetInt( Math.clamp(0, 1, atoi(args.Arg(1))) );
-			g_PlayerFuncs.ClientPrint( pPlayer, HUD_PRINTCONSOLE, "\"q2_infinite_ammo\" changed to \"" + cvar_InfiniteAmmo.GetInt() + "\"\n" );
-		}
-	}
 }
 
 } //end of namespace q2weapons
