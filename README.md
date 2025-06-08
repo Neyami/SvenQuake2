@@ -87,6 +87,13 @@ Models, textures, sounds, sprites, maps by iD Software.
 <BR>
 
 
+## BRAINS ##  
+`npc_q2brains`  
+
+
+<BR>
+
+
 ## GLADIATOR ##  
 [Video](https://youtu.be/yO9gGEOXl5k?si=vuvS8mBnJ1117vBe)  
 `npc_q2gladiator`  
