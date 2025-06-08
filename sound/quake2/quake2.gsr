@@ -22,3 +22,4 @@
 "debris/glass4.wav" "quake2/null.wav"
 "common/wpn_hudon.wav" "quake2/null.wav"
 "common/wpn_hudoff.wav" "quake2/null.wav"
+"player/pl_wade2.wav" "quake2/player/watr_out.wav"

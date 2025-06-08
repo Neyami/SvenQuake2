@@ -89,7 +89,25 @@
 
 @PointClass base(Quake2Monster) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/berserker/berserker.mdl") = npc_q2berserker : "Quake 2 Berserker" []
 
+@PointClass base(Quake2Monster) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/brains/brains.mdl") = npc_q2brains : "Quake 2 Brains" []
+[
+	spawnflags(Flags) =
+	[
+		1 : "Ambush" : 0
+		2 : "Trigger Spawn" : 0
+		8 : "no laser eyes" : 0
+	]
+]
+
+@PointClass base(Quake2Monster) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/medic/medic.mdl") = npc_q2medic : "Quake 2 Medic" []
+
 @PointClass base(Quake2Monster) size(-32 -32 0, 32 32 90) studio("models/quake2/monsters/gladiator/gladiator.mdl") = npc_q2gladiator : "Quake 2 Gladiator" []
+
+@PointClass base(Quake2Monster) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/medic/medic.mdl") = npc_q2medic_commander : "Quake 2 Medic Commander" 
+[
+    reinforcements(string): "Semicolon separated list of entity classes and cost of monster to spawn" : "npc_q2soldier_light 1;npc_q2soldier 2;npc_q2soldier_ss 2;npc_q2enforcer 3;npc_q2gunner 4;npc_q2medic 5;npc_q2gladiator 6"
+    monster_slots(integer) : "How many points to spend on monster spawns. Increases by up to 2x for Hard skill" : 3
+]
 
 @PointClass base(Quake2Monster) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/tank/tank.mdl") = npc_q2tank : "Quake 2 Tank" []
 
