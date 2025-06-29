@@ -40,10 +40,10 @@ class monsterinfo_t
 	//funcdef void	sight( CBaseEntity@ other ); //CBaseEntity@ self, 
 	//funcdef void checkattack( CBaseEntity@ self );
 
-	float							pausetime;
+	float							pausetime;*/
 	float							attack_finished;
 
-	Vector						saved_goal;
+	/*Vector						saved_goal;
 	float							search_time;
 	float							trail_time;
 	Vector						last_sighting;
@@ -58,6 +58,10 @@ class monsterinfo_t
 	int							medicTries;
 	EHandle					badMedic1, badMedic2; // these medics have declared this monster "unhealable"
 	EHandle					healer;
+
+	bool							can_jump; // will the monster jump?
+	float							drop_height;
+	float							jump_height;
 
 	// used by the spawners to not spawn too much and keep track of #s of monsters spawned
 	int							monster_slots; // nb: for spawned monsters, this is how many slots we took from our commander
@@ -87,6 +91,8 @@ class monsterinfo_t
 
 	reinforcement_list_t	reinforcements; 
 	array<uint8>				chosen_reinforcements; // readied for spawn; 255 is value for none //std::array<uint8_t, MAX_REINFORCEMENTS>
+
+	float							jump_time;
 
 	monsterinfo_t() {} // Constructor (optional)
 }
@@ -123,7 +129,7 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 	protected float m_flNextFidget;
 	protected float m_flHeatTurnRate; //for heat-seeking rockets
 	protected float m_flHealthMultiplier = 1.0;
-	protected float m_flPainDebounceTime;
+	float pain_debounce_time;
 	protected float m_flFlySoundDebounceTime;
 	protected float m_flTriggeredSpawn;
 
@@ -321,7 +327,11 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		}
 	}
 
-	bool CheckMeleeAttack1( float flDot, float flDist )
+	bool CheckMeleeAttack1( float flDot, float flDist ) { return CheckMeleeAttackBase( flDot, flDist ); }
+
+	bool CheckMeleeAttack2( float flDot, float flDist ) { return CheckMeleeAttackBase( flDot, flDist ); }
+
+	bool CheckMeleeAttackBase( float flDot, float flDist )
 	{
 		if( m_bRerelease )
 		{
@@ -344,27 +354,40 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		return false;
 	}
 
-	bool CheckMeleeAttack2( float flDot, float flDist )
+	int TakeDamage( entvars_t@ pevInflictor, entvars_t@ pevAttacker, float flDamage, int bitsDamageType )
 	{
-		if( m_bRerelease )
-		{
-			if( g_Engine.time < monsterinfo.melee_debounce_time )
-				return false;
+		float psave = CheckPowerArmor( pevInflictor, flDamage );
+		flDamage -= psave;
 
-			if( flDist <= Q2_MELEE_DISTANCE_RR /*and flDot >= 0.7 and self.m_hEnemy.IsValid() and self.m_hEnemy.GetEntity().pev.FlagBitSet(FL_ONGROUND)*/ )
-				return true;
+		SetSkin();
+
+		if( pevAttacker !is self.pev )
+		{
+			if( self.IRelationship(g_EntityFuncs.Instance(pevAttacker)) > R_NO )
+				pevAttacker.frags += ( flDamage/90 );
+			else
+				pevAttacker.frags -= ( flDamage/90 );
 		}
+
+		pev.dmg = flDamage;
+
+		if( pev.deadflag == DEAD_NO )
+			MonsterPain( flDamage );
+
+		M_ReactToDamage( g_EntityFuncs.Instance(pevAttacker) );
+
+		if( pev.deadflag == DEAD_NO )
+			return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
 		else
-		{
-			//don't always melee in easy mode (75% chance?)
-			if( q2npc::g_iDifficulty == q2::DIFF_EASY and (Math.RandomLong(0, 32767) & 3) != 0 ) //(rand()&3)
-				return false;
+			return DeadTakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
+	}
 
-			if( flDist <= Q2_MELEE_DISTANCE /*and flDot >= 0.7 and self.m_hEnemy.IsValid() and self.m_hEnemy.GetEntity().pev.FlagBitSet(FL_ONGROUND)*/ )
-				return true;
-		}
+	void MonsterPain( float flDamage ) {}
 
-		return false;
+	bool TakeHealth( float flHealth, int bitsDamageType, int health_cap = 0 )
+	{
+		SetSkin();
+		return BaseClass.TakeHealth( flHealth, bitsDamageType, health_cap = 0 );
 	}
 
 	int DeadTakeDamage( entvars_t@ pevInflictor, entvars_t@ pevAttacker, float flDamage, int bitsDamageType )
@@ -527,6 +550,54 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		m_flFlySoundDebounceTime = 0;
 		monsterinfo.aiflags &= ~q2::AI_STUNK;
 		g_EntityFuncs.SetOrigin( self, pev.origin ); //gi.linkentity(self);
+	}
+
+	void monster_duck_up()
+	{
+		if( !HasFlags(monsterinfo.aiflags, q2::AI_DUCKED) )
+			return;
+
+		monsterinfo.aiflags &= ~q2::AI_DUCKED;
+		//self->maxs[2] = self->monsterinfo.base_height;
+		pev.takedamage = DAMAGE_YES;
+		// we finished a duck-up successfully, so cut the time remaining in half
+		//if (self->monsterinfo.next_duck_time > level.time)
+			//self->monsterinfo.next_duck_time = level.time + ((self->monsterinfo.next_duck_time - level.time) / 2);
+
+		g_EntityFuncs.SetOrigin( self, pev.origin ); //gi.linkentity(self);
+	}
+
+	void monster_jump_start()
+	{
+		monster_done_dodge();
+
+		monsterinfo.jump_time = g_Engine.time + 3.0;
+	}
+
+	void monster_done_dodge()
+	{
+		monsterinfo.aiflags &= ~q2::AI_DODGING;
+		//if (monsterinfo.attack_state == AS_SLIDING)
+			//monsterinfo.attack_state = AS_STRAIGHT;
+	}
+
+	bool monster_jump_finished()
+	{
+		// if we lost our forward velocity, give us more
+		Vector vecForward;
+
+		g_EngineFuncs.AngleVectors( pev.angles, vecForward, void, void );
+
+		Vector forward_velocity = Vector( pev.velocity.x * vecForward.x, pev.velocity.y * vecForward.y, pev.velocity.z * vecForward.x ); //pev.velocity.scaled( vecForward );
+
+		if( forward_velocity.Length() < 150.0 )
+		{
+			float z_velocity = pev.velocity.z;
+			pev.velocity = vecForward * 150.0;
+			pev.velocity.z = z_velocity;
+		}
+
+		return monsterinfo.jump_time < g_Engine.time;
 	}
 
 	CBaseEntity@ DropItem( string sItemName )
@@ -751,12 +822,14 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 	void SetSkin() { MonsterSetSkin(); }
 	void MonsterSetSkin() {}
 
-	bool M_ShouldReactToPain()
+	bool M_ShouldReactToPain( /*const int &in mod = 0*/ )
 	{
-		if( q2npc::g_iDifficulty >= q2::DIFF_NIGHTMARE )
+		if( HasFlags(monsterinfo.aiflags, (q2::AI_DUCKED | q2::AI_COMBAT_POINT)) )
 			return false;
 
-		return true;
+		int mod = q2::GetMeansOfDeath( self );
+
+		return mod == q2::MOD_CHAINFIST or q2npc::g_iDifficulty < q2::DIFF_NIGHTMARE;
 	}
 
 	void M_ReactToDamage( CBaseEntity@ pAttacker )
@@ -1127,8 +1200,7 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		vecDir = vecPoint - self.m_hEnemy.GetEntity().pev.origin;
 
 		// do the damage
-		//T_Damage (tr.ent, self, self, vecDir, vecPoint, vec3_origin, flDamage, iKick/2, DAMAGE_NO_KNOCKBACK, MOD_HIT);
-		q2::T_Damage( g_EntityFuncs.Instance(tr.pHit), self, self, vecDir, vecPoint, g_vecZero, flDamage, iKick/2, 0, q2::MOD_HIT );
+		q2::T_Damage( g_EntityFuncs.Instance(tr.pHit), self, self, vecDir, vecPoint, g_vecZero, flDamage, iKick/2, q2::DAMAGE_NO_KNOCKBACK, q2::MOD_HIT );
 		//g_EntityFuncs.Instance(tr.pHit).TakeDamage( self.pev, self.pev, flDamage, DMG_GENERIC );
 
 		//if( !(tr.ent->svflags & SVF_MONSTER) and (!tr.ent->client) )
@@ -1207,7 +1279,7 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 		dir = point - self.m_hEnemy.GetEntity().pev.origin;
 
 		// do the damage
-		q2::T_Damage( g_EntityFuncs.Instance(tr.pHit), self, self, dir, point, g_vecZero, flDamage, iKick / 2, 0, q2::MOD_HIT ); //DAMAGE_NO_KNOCKBACK, MOD_HIT
+		q2::T_Damage( g_EntityFuncs.Instance(tr.pHit), self, self, dir, point, g_vecZero, flDamage, iKick / 2, q2::DAMAGE_NO_KNOCKBACK, q2::MOD_HIT );
 
 		if( !tr.pHit.vars.FlagBitSet(FL_MONSTER|FL_CLIENT) ) //if (!(tr.ent->svflags & SVF_MONSTER) && (!tr.ent->client))
 			return false;
@@ -2418,6 +2490,20 @@ class CBaseQ2NPC : ScriptBaseMonsterEntity
 	}
 
 	//from quake 2 rerelease
+	bool M_CheckBottom()
+	{
+		// if all of the points under the corners are solid world, don't bother
+		// with the tougher checks
+
+		if( M_CheckBottom_Fast_Generic(pev.origin + pev.mins, pev.origin + pev.maxs, false) ) //ent->gravityVector[2] > 0 (gravityVector[2] should always be -1.0 for most monsters)
+			return true; // we got out easy
+
+		//contents_t mask = (ent->svflags & SVF_MONSTER) ? MASK_MONSTERSOLID : (MASK_SOLID | CONTENTS_MONSTER | CONTENTS_PLAYER);
+		int mask = 0;
+		return M_CheckBottom_Slow_Generic( pev.origin, pev.mins, pev.maxs, self.edict(), mask, false, HasFlags(m_iSpawnFlags, q2::SPAWNFLAG_MONSTER_SUPER_STEP) ); //ent->gravityVector[2] > 0
+	}
+
+	//from quake 2 rerelease
 	CBaseEntity@ CreateGroundMonster( const Vector &in origin, const Vector &in angles, const Vector &in entMins, const Vector &in entMaxs, const string &in sClassname, float height )
 	{
 		CBaseEntity@ newEnt = null;
@@ -2684,20 +2770,14 @@ ScriptSchedule slQ2Pain4
 void InitQ2BaseSchedules()
 {
 	slQ2Pain1.AddTask( ScriptTask(TASK_STOP_MOVING) );
-	slQ2Pain1.AddTask( ScriptTask(TASK_PLAY_SEQUENCE, float(ACT_FLINCH_STOMACH)) );
-	//slQ2Pain1.AddTask( ScriptTask(TASK_PAIN_LOOP, 0) );
+	slQ2Pain1.AddTask( ScriptTask(TASK_SET_ACTIVITY, float(ACT_FLINCH_STOMACH)) );
 
 	slQ2Pain2.AddTask( ScriptTask(TASK_STOP_MOVING) );
-	slQ2Pain2.AddTask( ScriptTask(TASK_PLAY_SEQUENCE, float(ACT_FLINCH_CHEST)) );
+	slQ2Pain2.AddTask( ScriptTask(TASK_SET_ACTIVITY, float(ACT_FLINCH_CHEST)) );
 
 	slQ2Pain3.AddTask( ScriptTask(TASK_STOP_MOVING) );
-	slQ2Pain3.AddTask( ScriptTask(TASK_PLAY_SEQUENCE, float(ACT_FLINCH_HEAD)) );
+	slQ2Pain3.AddTask( ScriptTask(TASK_SET_ACTIVITY, float(ACT_FLINCH_HEAD)) );
 
 	slQ2Pain4.AddTask( ScriptTask(TASK_STOP_MOVING) );
-	slQ2Pain4.AddTask( ScriptTask(TASK_PLAY_SEQUENCE, float(ACT_FLINCH_LEFTARM)) );
+	slQ2Pain4.AddTask( ScriptTask(TASK_SET_ACTIVITY, float(ACT_FLINCH_LEFTARM)) );
 }
-
-/*
-self.m_hTargetEnt
-self.MoveToTarget( Activity movementAct, float waitTime ) 
-*/

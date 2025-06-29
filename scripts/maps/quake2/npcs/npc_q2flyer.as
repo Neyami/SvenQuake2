@@ -310,7 +310,7 @@ final class npc_q2flyer : ScriptBaseMonsterEntity, CBaseQ1Flying
 
 				// nightmare mode monsters don't go into pain frames often
 				if( q2npc::g_iDifficulty == q2::DIFF_NIGHTMARE )
-					m_flPainDebounceTime = g_Engine.time + 5.0;
+					pain_debounce_time = g_Engine.time + 5.0;
 			}
 		}
 
@@ -327,10 +327,10 @@ final class npc_q2flyer : ScriptBaseMonsterEntity, CBaseQ1Flying
 
 	void HandlePain( float flDamage )
 	{
-		if( g_Engine.time < m_flPainDebounceTime )
+		if( g_Engine.time < pain_debounce_time )
 			return;
 
-		m_flPainDebounceTime = g_Engine.time + 3.0;
+		pain_debounce_time = g_Engine.time + 3.0;
 
 		int iRand = Math.RandomLong( 0, 2 );
 

@@ -71,7 +71,7 @@ mixin class CBaseQ1Flying
 	//QUAKE 2
 	bool m_bRerelease= true;
 	float m_flHealthMultiplier = 1.0;
-	float m_flPainDebounceTime;
+	float pain_debounce_time;
 
 	//OTHER
 	private int m_iWeaponType;

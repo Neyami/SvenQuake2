@@ -5,8 +5,8 @@ enum sflag_e
 {
 	SPAWNFLAG_MONSTER_AMBUSH = 1,
 	SPAWNFLAG_MONSTER_TRIGGER_SPAWN = 2,
-	SPAWNFLAG_MONSTER_DEAD = 65536/*,
-	SPAWNFLAG_MONSTER_SUPER_STEP = 131072,
+	SPAWNFLAG_MONSTER_DEAD = 65536,
+	SPAWNFLAG_MONSTER_SUPER_STEP = 131072/*,
 	SPAWNFLAG_MONSTER_NO_DROP = 262144,
 	SPAWNFLAG_MONSTER_SCENIC = 524288*/
 };
@@ -296,16 +296,16 @@ const int64 AI_PURSUE_TEMP						= bit64( 6 );		//64
 const int64 AI_HOLD_FRAME						= bit64( 7 );		//128
 const int64 AI_GOOD_GUY							= bit64( 8 );		//256
 const int64 AI_BRUTAL								= bit64( 9 );		//512
-const int64 AI_NOSTEP								= bit64( 10 );	//1024
+const int64 AI_NOSTEP								= bit64( 10 );	//1024*/
 const int64 AI_DUCKED								= bit64( 11 );	//2048
-const int64 AI_COMBAT_POINT					= bit64( 12 );	//4096*/
+const int64 AI_COMBAT_POINT					= bit64( 12 );	//4096
 const int64 AI_MEDIC									= bit64( 13 );	//8192
 const int64 AI_RESURRECTING					= bit64( 14 );	//16384
 const int64 AI_MANUAL_STEERING				= bit64( 15 );	//32768
-/*const int64 AI_TARGET_ANGER					= bit64( 16 );	//65536
+//const int64 AI_TARGET_ANGER					= bit64( 16 );	//65536
 const int64 AI_DODGING							= bit64( 17 );	//131072
-const int64 AI_CHARGING							= bit64( 18 );	//262144
-const int64 AI_HINT_PATH							= bit64( 19 );	//524288*/
+//const int64 AI_CHARGING							= bit64( 18 );	//262144
+//const int64 AI_HINT_PATH							= bit64( 19 );	//524288
 const int64 AI_IGNORE_SHOTS					= bit64( 20 );	//1048576
 const int64 AI_DO_NOT_COUNT					= bit64( 21 );	//2097152 // set for healed monsters
 const int64 AI_SPAWNED_CARRIER				= bit64( 22 );	//4194304 // both do_not_count and spawned are set for spawned monsters

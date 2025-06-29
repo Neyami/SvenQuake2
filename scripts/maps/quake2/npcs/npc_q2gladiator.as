@@ -266,29 +266,6 @@ final class npc_q2gladiator : CBaseQ2NPC
 		return false;
 	}
 
-	int TakeDamage( entvars_t@ pevInflictor, entvars_t@ pevAttacker, float flDamage, int bitsDamageType )
-	{
-		float psave = CheckPowerArmor( pevInflictor, flDamage );
-		flDamage -= psave;
-
-		SetSkin();
-
-		if( pevAttacker !is self.pev )
-			pevAttacker.frags += ( flDamage/90 );
-
-		pev.dmg = flDamage;
-
-		if( pev.deadflag == DEAD_NO )
-			HandlePain( flDamage );
-
-		M_ReactToDamage( g_EntityFuncs.Instance(pevAttacker) );
-
-		if( pev.deadflag == DEAD_NO )
-			return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
-		else
-			return DeadTakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
-	}
-
 	void MonsterSetSkin()
 	{
 		if( pev.health < (pev.max_health / 2) )
@@ -297,9 +274,9 @@ final class npc_q2gladiator : CBaseQ2NPC
 			pev.skin &= ~1;
 	}
 
-	void HandlePain( float flDamage )
+	void MonsterPain( float flDamage )
 	{
-		if( g_Engine.time < m_flPainDebounceTime )
+		if( g_Engine.time < pain_debounce_time )
 		{
 			if( pev.velocity.z > 100 and GetAnim(ANIM_PAIN) )
 				self.ChangeSchedule( slQ2Pain2 );
@@ -307,7 +284,7 @@ final class npc_q2gladiator : CBaseQ2NPC
 			return;
 		}
 
-		m_flPainDebounceTime = g_Engine.time + 3.0;
+		pain_debounce_time = g_Engine.time + 3.0;
 
 		g_SoundSystem.StopSound( self.edict(), CHAN_WEAPON, arrsNPCSounds[SND_RAILGUN] );
 		g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[Math.RandomLong(SND_PAIN1, SND_PAIN2)], VOL_NORM, ATTN_NORM );

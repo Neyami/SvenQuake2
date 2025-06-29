@@ -3,7 +3,6 @@
 #include "npcs/q2/fire_funcs"
 #include "npcs/q2npcflying"
 #include "entities/bossexploder"
-#include "entities/spawngro"
 
 #include "npcs/npc_q2soldier" //20-40 HP
 #include "npcs/npc_q2flyer" //50 HP
@@ -13,6 +12,7 @@
 #include "npcs/npc_q2ironmaiden" //175 HP
 #include "npcs/npc_q2berserker" //240 HP
 #include "npcs/npc_q2brains" //300 HP
+#include "npcs/npc_q2mutant" //300 HP
 #include "npcs/npc_q2gladiator" //400 HP
 #include "npcs/npc_q2tank" //750-1000 HP
 #include "npcs/npc_q2supertank" //1500 HP
@@ -49,6 +49,7 @@ const array<string> g_arrsQ2Monsters =
 	"npc_q2ironmaiden",
 	"npc_q2berserker",
 	"npc_q2brains",
+	"npc_q2mutant",
 	"npc_q2gladiator",
 	"npc_q2tank",
 	"npc_q2tankc",
@@ -69,6 +70,7 @@ dictionary g_dicMonsterNames =
 	{ "npc_q2ironmaiden", "an Iron Maiden" },
 	{ "npc_q2berserker", "a Berserker" },
 	{ "npc_q2brains", "a Brains" },
+	{ "npc_q2mutant", "a Mutant" },
 	{ "npc_q2gladiator", "a Gladiator" },
 	{ "npc_q2tank", "a Tank" },
 	{ "npc_q2tankc", "a Tank Commander" },
@@ -103,6 +105,7 @@ void InitializeNPCS()
 	npc_q2ironmaiden::Register();
 	npc_q2berserker::Register();
 	npc_q2brains::Register();
+	npc_q2mutant::Register();
 	npc_q2gladiator::Register();
 	npc_q2tank::Register();
 	npc_q2supertank::Register();

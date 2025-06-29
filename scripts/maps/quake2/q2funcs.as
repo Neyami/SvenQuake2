@@ -222,8 +222,6 @@ void T_Damage( CBaseEntity@ pTarget, CBaseEntity@ pInflictor, CBaseEntity@ pAtta
 		if( pTarget !is null )
 		{
 			q2::SetMeansOfDeath( pTarget, iMeansOfDeath );
-			//CustomKeyvalues@ pCustom = pTarget.GetCustomKeyvalues();
-			//pCustom.SetKeyvalue( KVN_MOD, iMeansOfDeath );
 			//g_Game.AlertMessage( at_notice, "MEANS OF DEATH SET TO %1\n", iMeansOfDeath );
 		}
 
@@ -249,19 +247,26 @@ void T_Damage( CBaseEntity@ pTarget, CBaseEntity@ pInflictor, CBaseEntity@ pAtta
 		}*/
 	}
 
-/*
-	if (targ->svflags & SVF_MONSTER)
+	//if( pTarget.pev.FlagBitSet(FL_MONSTER) )
+	if( pMonster !is null )
 	{
-		M_ReactToDamage (targ, attacker);
-		if (!(targ->monsterinfo.aiflags & AI_DUCKED) && (take))
+		//if( m_bRerelease )
 		{
-			targ->pain (targ, attacker, knockback, take);
-			// nightmare mode monsters don't go into pain frames often
-			if (skill->value == 3)
-				targ->pain_debounce_time = level.time + 5;
+			//if (targ->monsterinfo.setskin)
+				pMonster.SetSkin();
 		}
+
+		//not needed since all of this gets called in int TakeDamage
+		/*M_ReactToDamage( pAttacker );
+		if( !HasFlags(pMonster.monsterinfo.aiflags, q2::AI_DUCKED) and flTake > 0.0 )
+		{
+			pMonster.MonsterPain( flTake ); //targ->pain (targ, attacker, knockback, take);
+
+			// nightmare mode monsters don't go into pain frames often
+			if( q2npc::g_iDifficulty == q2::DIFF_NIGHTMARE )
+				pMonster.pain_debounce_time = g_Engine.time + 5.0;
+		}*/
 	}
-*/
 }
 
 const array <int>splash_color = { 0, 93, 40, 159, 253, 93, 231 }; 
@@ -1353,6 +1358,11 @@ void SV_AddBlend (float r, float g, float b, float a, float *v_blend)
 	v_blend[3] = a2;
 }
 */
+
+bool brandom()
+{
+	return Math.RandomLong(0, 1) == 1;
+}
 
 float crandom()
 {

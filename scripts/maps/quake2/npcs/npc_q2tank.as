@@ -243,7 +243,7 @@ final class npc_q2tank : CBaseQ2NPC
 						return BaseClass.GetScheduleOfType( SCHED_MELEE_ATTACK1 ); //machine gun
 					else if( flRandom < 0.66 )
 					{
-						m_flPainDebounceTime = g_Engine.time + 5.0; // no pain for a while
+						pain_debounce_time = g_Engine.time + 5.0; // no pain for a while
 						return BaseClass.GetScheduleOfType( SCHED_RANGE_ATTACK2 ); //rocket launcher
 					}
 					else
@@ -456,15 +456,13 @@ final class npc_q2tank : CBaseQ2NPC
 		pev.dmg = flDamage;
 
 		if( pev.deadflag == DEAD_NO )
-			HandlePain( flDamage , pevInflictor.classname );
+			MonsterPain( flDamage , pevInflictor.classname );
 
-		//don't send the tank flying unless the damage is very high (nukes?)
+		//don't get sent flying unless the damage is very high (nukes?)
 		if( flDamage < 500 )
 			bitsDamageType &= ~DMG_BLAST|DMG_LAUNCH;
 
 		M_ReactToDamage( g_EntityFuncs.Instance(pevAttacker) );
-
-		//g_Game.AlertMessage( at_notice, "pev.health: %1\n", pev.health );
 
 		if( pev.deadflag == DEAD_NO )
 			return BaseClass.TakeDamage( pevInflictor, pevAttacker, flDamage, bitsDamageType );
@@ -480,12 +478,12 @@ final class npc_q2tank : CBaseQ2NPC
 			pev.skin &= ~1;
 	}
 
-	void HandlePain( float flDamage, string sWeaponName )
+	void MonsterPain( float flDamage, string sWeaponName )
 	{
 		if( sWeaponName != "weapon_q2chainfist" and flDamage <= 10 )
 			return;
 
-		if( g_Engine.time < m_flPainDebounceTime )
+		if( g_Engine.time < pain_debounce_time )
 			return;
 
 		if( sWeaponName != "weapon_q2chainfist" )
@@ -502,7 +500,7 @@ final class npc_q2tank : CBaseQ2NPC
 				return;
 		}
 
-		m_flPainDebounceTime = g_Engine.time + 3.0;
+		pain_debounce_time = g_Engine.time + 3.0;
 
 		if( self.GetClassname() == "npc_q2tank" )
 			g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_PAIN], VOL_NORM, ATTN_NORM );

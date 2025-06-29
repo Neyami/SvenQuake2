@@ -542,9 +542,9 @@ final class npc_q2jorg : CBaseQ2NPC
 		pev.dmg = flDamage;
 
 		if( pev.deadflag == DEAD_NO )
-			HandlePain( flDamage , pevInflictor.classname );
+			MonsterPain( flDamage , pevInflictor.classname );
 
-		//don't send Jorg flying unless the damage is very high (nukes?)
+		//don't get sent flying unless the damage is very high (nukes?)
 		if( flDamage < 500 )
 			bitsDamageType &= ~DMG_BLAST|DMG_LAUNCH;
 
@@ -564,9 +564,9 @@ final class npc_q2jorg : CBaseQ2NPC
 			pev.skin = 0;
 	}
 
-	void HandlePain( float flDamage, string sWeaponName )
+	void MonsterPain( float flDamage, string sWeaponName )
 	{
-		if( g_Engine.time < m_flPainDebounceTime )
+		if( g_Engine.time < pain_debounce_time )
 			return;
 
 		// Lessen the chance of him going into his pain frames if he takes little damage
@@ -598,7 +598,7 @@ final class npc_q2jorg : CBaseQ2NPC
 			}
 		}
 
-		m_flPainDebounceTime = g_Engine.time + 3.0;
+		pain_debounce_time = g_Engine.time + 3.0;
 
 		bool bDoPain3 = false;
 

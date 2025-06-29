@@ -196,12 +196,12 @@ void CreateRailbeam( Vector vecStart, Vector vecEnd )
 }
 
 //from quake 2 
-void fire_bullet( CBaseEntity@ self, Vector start, Vector aimdir, float damage, int kick, int hspread, int vspread, int mod )
+void fire_bullet( CBaseEntity@ self, Vector start, Vector aimdir, float damage, float kick, int hspread, int vspread, int mod )
 {
 	fire_lead( self, start, aimdir, damage, kick, q2::TE_GUNSHOT, hspread, vspread, mod );
 }
 
-void fire_shotgun( CBaseEntity@ self, Vector start, Vector aimdir, float damage, int kick, int hspread, int vspread, int count, int mod )
+void fire_shotgun( CBaseEntity@ self, Vector start, Vector aimdir, float damage, float kick, int hspread, int vspread, int count, int mod )
 {
 	for( int i = 0; i < count; i++ )
 		fire_lead( self, start, aimdir, damage, kick, q2::TE_SHOTGUN, hspread, vspread, mod );

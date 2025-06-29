@@ -177,7 +177,7 @@ class weapon_q2chainfist : CBaseQ2Weapon
 			g_SoundSystem.EmitSoundDyn( m_pPlayer.edict(), CHAN_ITEM, pQ2WSounds[SND_QUAD_FIRE], VOL_NORM, ATTN_NORM );
 		}
 
-		if( fire_player_melee(vecMuzzle, Q2W_RANGE, flDamage, 100) )
+		if( fire_player_melee(vecMuzzle, m_pPlayer.pev.v_angle, Q2W_RANGE, flDamage, 100, q2::MOD_CHAINFIST) )
 		{
 			if( m_flHitSound < g_Engine.time )
 			{

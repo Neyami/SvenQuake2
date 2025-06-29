@@ -483,9 +483,9 @@ final class npc_q2supertank : CBaseQ2NPC
 		pev.dmg = flDamage;
 
 		if( pev.deadflag == DEAD_NO )
-			HandlePain( flDamage , pevInflictor.classname );
+			MonsterPain( flDamage , pevInflictor.classname );
 
-		//don't send the tank flying unless the damage is very high (nukes?)
+		//don't get sent flying unless the damage is very high (nukes?)
 		if( flDamage < 500 )
 			bitsDamageType &= ~DMG_BLAST|DMG_LAUNCH;
 
@@ -505,9 +505,9 @@ final class npc_q2supertank : CBaseQ2NPC
 			pev.skin &= ~1;
 	}
 
-	void HandlePain( float flDamage, string sWeaponName )
+	void MonsterPain( float flDamage, string sWeaponName )
 	{
-		if( g_Engine.time < m_flPainDebounceTime )
+		if( g_Engine.time < pain_debounce_time )
 			return;
 
 		// Lessen the chance of him going into his pain frames
@@ -531,7 +531,7 @@ final class npc_q2supertank : CBaseQ2NPC
 		else
 			g_SoundSystem.EmitSound( self.edict(), CHAN_VOICE, arrsNPCSounds[SND_PAIN2], VOL_NORM, ATTN_NORM );
 
-		m_flPainDebounceTime = g_Engine.time + 3.0;
+		pain_debounce_time = g_Engine.time + 3.0;
 
 		if( !M_ShouldReactToPain() )
 			return;

@@ -275,33 +275,70 @@ class CBaseQ2Weapon : ScriptBasePlayerWeaponEntity
 
 		g_EntityFuncs.DispatchSpawn( pBFG.edict() );
 	}
+/*
+int MonstersInSphere(array<CBaseEntity@>@ pArray, const Vector& in vecCenter, float flRadius)   Finds monsters in a sphere  
+array <CBaseEntity@> arrTargets(32);
+int iNum = g_EntityFuncs.MonstersInSphere( arrTargets, m_pPlayer.GetGunPosition() + g_Engine.v_forward * 32, 4096 );  
 
+int EntitiesInBox(array<CBaseEntity@>@ pArray, const Vector& in mins, const Vector& in maxs, int flagMask)   Finds entities in a box  
+
+int TargetsInBox(array<CBaseEntity@>@ pArray, const Vector& in mins, const Vector& in maxs)   Finds targets in a box  
+*/
+	//from quake 2 rerelease
 	//CBaseEntity@ CheckTraceHullAttack( float flDist, float flDamage, int iDmgType )
 	//bool fire_player_melee( const Vector &in vecStart, const Vector &in vecEnd, float flDist, float flDamage, int kick/*, mod_t mod*/ )
-	bool fire_player_melee( const Vector &in vecStart, float flDist, float flDamage, int kick )
+	//bool fire_player_melee( const Vector &in vecStart, float flDist, float flDamage, int kick, int mod )
+	bool fire_player_melee( const Vector &in vecStart, const Vector &in vecAim, float flReach, float flDamage, float flKick, int mod )
 	{
-		if( flDamage <= 0 ) return false;
+		const int MAX_HIT = 4;
 
-		TraceResult tr;
+		Vector vecReachVec( (flReach - 1), (flReach - 1), (flReach - 1) );
+		array<CBaseEntity@> arrpTargets( MAX_HIT );
 
-		Math.MakeVectors( m_pPlayer.pev.angles );
+		/*player_melee_data_t data { self, vecStart, vecAim, flReach };
+		// find all the things we could maybe hit
+		size_t iNum = gi.BoxEdicts(self->absmin - vecReachVec, self->absmax + vecReachVec, arrpTargets, q_countof(arrpTargets), AREA_SOLID, fire_player_melee_BoxFilter, &data);*/
 
-		Vector vecEnd = vecStart + (g_Engine.v_forward * flDist);
+		int iNum = g_EntityFuncs.EntitiesInBox( arrpTargets, m_pPlayer.pev.absmin - vecReachVec, m_pPlayer.pev.absmax + vecReachVec, (FL_CLIENT|FL_MONSTER) );
 
-		g_Utility.TraceHull( vecStart, vecEnd, dont_ignore_monsters, head_hull, self.edict(), tr );
+		if( iNum == 0 )
+			return false;
 
-		if( tr.pHit !is null )
+		bool bWasHit = false;
+
+		for( int i = 0; i < iNum; i++ )
 		{
-			CBaseEntity@ pHit = g_EntityFuncs.Instance( tr.pHit );
-			if( q2::IsAlly(m_pPlayer, pHit) ) return false;
+			CBaseEntity@ pHit = arrpTargets[ i ];
 
-			//pHit.TakeDamage( self.pev, self.pev, flDamage, DMG_SLASH );
-			Vector closest_point_to_check = q2::closest_point_to_box( vecStart, pHit.pev.origin + pHit.pev.mins, pHit.pev.origin + pHit.pev.maxs );
-			q2::T_Damage( pHit, self, self, g_Engine.v_forward, closest_point_to_check, -g_Engine.v_forward, flDamage, kick / 2, q2::DAMAGE_DESTROY_ARMOR | q2::DAMAGE_NO_KNOCKBACK, q2::MOD_UNKNOWN );
+			if( pHit is null or pHit.pev.takedamage == DAMAGE_NO )
+				continue;
 
-			return true;
+			if( !q2::CanDamage(m_pPlayer, pHit) ) //else if in the original
+				continue;
+
+			if( q2::IsAlly(m_pPlayer, pHit) )
+				continue;
+
+			// do the damage
+			Vector closest_point_to_check = q2::closest_point_to_box(vecStart, pHit.pev.origin + pHit.pev.mins, pHit.pev.origin + pHit.pev.maxs );
+
+			if( pHit.pev.FlagBitSet(FL_MONSTER) )
+			{
+				CBaseQ2NPC@ pMonster = q2npc::GetQ2Pointer( pHit );
+				if( pMonster !is null )
+				
+				pMonster.pain_debounce_time -= Math.RandomFloat( 0.005, 0.075 ); //5_ms, 75_ms
+			}
+
+			if( mod == q2::MOD_CHAINFIST )
+				q2::T_Damage( pHit, m_pPlayer, m_pPlayer, vecAim, closest_point_to_check, -vecAim, flDamage, flKick / 2, q2::DAMAGE_DESTROY_ARMOR | q2::DAMAGE_NO_KNOCKBACK, mod );
+			else
+				q2::T_Damage( pHit, m_pPlayer, m_pPlayer, vecAim, closest_point_to_check, -vecAim, flDamage, flKick / 2, q2::DAMAGE_NO_KNOCKBACK, mod );
+
+			//g_Game.AlertMessage( at_notice, "mod: %1\n", mod );
+			bWasHit = true;
 		}
 
-		return false;
+		return bWasHit;
 	}
 }

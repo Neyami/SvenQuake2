@@ -276,6 +276,14 @@ void SetMeansOfDeath( CBaseEntity@ pEntity, int iMeansOfDeath )
 	pCustom.SetKeyvalue( q2::KVN_MOD, iMeansOfDeath );
 }
 
+int GetMeansOfDeath( CBaseEntity@ pEntity )
+{
+	CustomKeyvalues@ pCustom = pEntity.GetCustomKeyvalues();
+	int iValue = pCustom.GetKeyvalue( q2::KVN_MOD ).GetInteger();
+
+	return iValue;
+}
+
 void ClientObituary( CBasePlayer@ pPlayer, CBaseEntity@ pInflictor, CBaseEntity@ pAttacker, float flDamage, int bitsDamageType, int iMeansOfDeath )
 {
 	//g_Game.AlertMessage( at_notice, "ClientObituary %1 %2 %3 %4 %5 %6\n", pPlayer.pev.netname, pInflictor.GetClassname(), pAttacker.GetClassname(), flDamage, bitsDamageType, iMeansOfDeath );
@@ -429,6 +437,8 @@ void ClientObituary( CBasePlayer@ pPlayer, CBaseEntity@ pInflictor, CBaseEntity@
 						sDeathMsg = string(pPlayer.pev.netname) + " was smashed by a Berserker\n";
 					else if( pAttacker.GetClassname() == "npc_q2brains" )
 						sDeathMsg = string(pPlayer.pev.netname) + " was sliced to pieces by a Brains\n"; //a Brains ??
+					else if( pAttacker.GetClassname() == "npc_q2mutant" )
+						sDeathMsg = string(pPlayer.pev.netname) + " was clawed by a Mutant\n";
 					else if( pAttacker.GetClassname() == "npc_q2gladiator" )
 						sDeathMsg = string(pPlayer.pev.netname) + " was mangled by a Gladiator's claw\n";
 
