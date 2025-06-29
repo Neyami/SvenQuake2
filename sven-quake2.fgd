@@ -99,6 +99,14 @@
 	]
 ]
 
+@PointClass base(Quake2Monster) size(-32 -32 -24, 32 32 32) studio("models/quake2/monsters/mutant/mutant.mdl") = npc_q2mutant : "Quake 2 Mutant" 
+[
+    spawnflags(Flags) =
+    [
+        8 : "No jumping" : 0
+    ]
+]
+
 @PointClass base(Quake2Monster) size(-16 -16 0, 16 16 72) studio("models/quake2/monsters/medic/medic.mdl") = npc_q2medic : "Quake 2 Medic" []
 
 @PointClass base(Quake2Monster) size(-32 -32 0, 32 32 90) studio("models/quake2/monsters/gladiator/gladiator.mdl") = npc_q2gladiator : "Quake 2 Gladiator" []
